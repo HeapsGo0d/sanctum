@@ -36,9 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama (official binary download - NOT convenience script)
-RUN curl -fsSL https://ollama.com/download/ollama-linux-amd64 -o /usr/local/bin/ollama && \
-    chmod +x /usr/local/bin/ollama
+# Install Ollama (using official install script)
+RUN curl -fsSL https://ollama.com/install.sh | sh
 
 # Install Open WebUI
 RUN pip3 install --no-cache-dir open-webui
