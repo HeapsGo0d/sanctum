@@ -31,11 +31,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     software-properties-common \
     gnupg \
+    build-essential \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
+    python3.11-dev \
     python3-pip \
     iptables \
     iproute2 \
@@ -43,8 +45,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama (using official install script)
-RUN curl -fsSL https://ollama.com/install.sh | sh
+# Install Ollama (manual binary installation - proper method)
+RUN curl -fsSL -o /tmp/ollama-linux-amd64.tgz \
+    https://github.com/ollama/ollama/releases/download/v0.5.4/ollama-linux-amd64.tgz \
+    && tar -C /usr -xzf /tmp/ollama-linux-amd64.tgz \
+    && rm /tmp/ollama-linux-amd64.tgz
 
 # Install Open WebUI
 RUN pip3 install --no-cache-dir open-webui
@@ -59,8 +64,7 @@ RUN chmod +x /scripts/*.sh /scripts/privacy/*.sh
 # Expose ports
 # 8080 - Open WebUI (HTTP)
 # 11434 - Ollama API (internal, not exposed)
-# 22 - SSH (RunPod default)
-EXPOSE 8080 22
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

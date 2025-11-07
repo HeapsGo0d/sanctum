@@ -2,11 +2,11 @@
 
 **Minimal · Privacy-First · RunPod-Native**
 
-Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI with network isolation, telemetry blocking, and controlled egress. Built for simplicity and security.
+Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI with telemetry blocking. Built for simplicity and security.
 
 ## ✨ Features
 
-- **🔒 Privacy-First**: Network isolation with allowlist, telemetry blocking via /etc/hosts
+- **🔒 Privacy-First**: Telemetry blocking via /etc/hosts (20+ analytics domains)
 - **⚡ Fast Startup**: Two services, no unnecessary operations
 - **🎯 Minimal**: Clean architecture, essential functionality only
 - **💾 Persistent Storage**: Models and data survive pod restarts
@@ -44,10 +44,7 @@ Once running, access Open WebUI at:
 http://[your-pod-id]-8080.proxy.runpod.net
 ```
 
-SSH access (optional):
-```bash
-ssh root@[your-pod-id]-ssh.proxy.runpod.net
-```
+**Note**: RunPod provides SSH access automatically. No additional configuration needed.
 
 ## 🧪 Local Testing
 
@@ -66,9 +63,6 @@ Test privacy mode:
 # Shell into container
 docker exec -it sanctum bash
 
-# Check iptables rules
-iptables -L OUTPUT -n -v
-
 # Check blocked domains
 grep "0.0.0.0" /etc/hosts
 ```
@@ -83,28 +77,13 @@ grep "0.0.0.0" /etc/hosts
 | `DATA_DIR` | `/workspace/data` | Open WebUI data directory |
 | `WEBUI_AUTH` | `False` | Enable Open WebUI authentication |
 | `WEBUI_PORT` | `8080` | Open WebUI port |
-| `PRIVACY_MODE` | `enabled` | Enable privacy protections (`enabled`/`disabled`) |
-| `ALLOWED_DOMAINS` | `ollama.com,huggingface.co,registry.ollama.ai,ghcr.io` | Allowed domains for network access |
+| `PRIVACY_MODE` | `enabled` | Enable telemetry blocking (`enabled`/`disabled`) |
 
 ## 🔒 Privacy Features
 
-### Network Isolation
+### Telemetry Blocking
 
 When `PRIVACY_MODE=enabled` (default):
-
-- **Default Deny**: All outbound traffic blocked by default
-- **Allowlist Only**: Only specified domains can be accessed
-- **DNS Filtering**: /etc/hosts blocks telemetry domains
-- **Localhost Allowed**: Internal service communication works
-- **Established Connections**: Return traffic allowed
-
-Allowed domains by default:
-- `ollama.com` - Ollama model downloads
-- `huggingface.co` - HuggingFace models
-- `registry.ollama.ai` - Ollama registry
-- `ghcr.io` - GitHub Container Registry
-
-### Telemetry Blocking
 
 Blocks common analytics and tracking domains:
 - Google Analytics, Tag Manager
@@ -190,17 +169,11 @@ Verify GPU is available:
 nvidia-smi
 ```
 
-### Network Issues
+### Check Privacy Status
 
-Check iptables rules:
+View blocked telemetry domains:
 ```bash
-iptables -L OUTPUT -n -v
-```
-
-Disable privacy mode temporarily:
-```bash
-export PRIVACY_MODE=disabled
-# Restart container
+grep "0.0.0.0" /etc/hosts
 ```
 
 ### Health Check Failures
@@ -224,7 +197,6 @@ sanctum/
     ├── startup.sh                          # Main entrypoint
     ├── health-check.sh                    # Service verification
     └── privacy/
-        ├── setup-network-isolation.sh      # iptables rules
         └── setup-blocklist.sh              # /etc/hosts blocking
 ```
 
@@ -268,11 +240,11 @@ MIT License - see LICENSE file for details.
 
 ## 🔐 Security Notes
 
-- Privacy mode uses iptables - requires `--privileged` or `CAP_NET_ADMIN`
-- `/etc/hosts` blocking may fail on read-only filesystems (gracefully degrades)
-- Allowlist filtering is domain-based via DNS blocking
-- For production use, consider additional network policies
-- Default `WEBUI_AUTH=False` - enable authentication for public deployments
+- **Privacy Scope**: Blocks known telemetry/analytics domains via `/etc/hosts`
+- **Limitations**: Does not provide full network isolation (open internet access remains)
+- **Production Use**: Consider additional network policies (firewalls, VPNs) for stricter isolation
+- **Authentication**: Default `WEBUI_AUTH=False` - enable for public deployments
+- **Graceful Degradation**: `/etc/hosts` blocking skipped on read-only filesystems
 
 ## 🙏 Acknowledgments
 

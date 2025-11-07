@@ -85,14 +85,9 @@ setup_privacy() {
             /scripts/privacy/setup-blocklist.sh
         fi
 
-        # Setup network isolation
-        if [[ -x /scripts/privacy/setup-network-isolation.sh ]]; then
-            /scripts/privacy/setup-network-isolation.sh
-        fi
-
         log "INFO" ""
     else
-        log "INFO" "⚠️  Privacy mode disabled - network unrestricted"
+        log "INFO" "⚠️  Privacy mode disabled"
         log "INFO" ""
     fi
 }
@@ -157,9 +152,8 @@ print_success() {
     log "INFO" ""
     log "INFO" "🔒 Privacy Status:"
     if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
-        log "INFO" "  ✓ Network isolation active"
         log "INFO" "  ✓ Telemetry blocking enabled"
-        log "INFO" "  ✓ Allowed domains: ${ALLOWED_DOMAINS:-ollama.com,huggingface.co,registry.ollama.ai,ghcr.io}"
+        log "INFO" "  ✓ Analytics domains blocked via /etc/hosts"
     else
         log "INFO" "  ⚠ Privacy protections disabled"
     fi
