@@ -51,6 +51,9 @@ RUN curl -fsSL -o /tmp/ollama-linux-amd64.tgz \
     && tar -C /usr -xzf /tmp/ollama-linux-amd64.tgz \
     && rm /tmp/ollama-linux-amd64.tgz
 
+# Upgrade pip, setuptools, and wheel for compatibility
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
 # Install Open WebUI
 RUN pip3 install --no-cache-dir open-webui
 
