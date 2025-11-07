@@ -25,15 +25,21 @@ ENV DATA_DIR=/workspace/data \
 ENV PRIVACY_MODE=enabled \
     ALLOWED_DOMAINS=ollama.com,huggingface.co,registry.ollama.ai,ghcr.io
 
-# System dependencies
+# System dependencies + Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    python3 \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
     python3-pip \
     iptables \
     iproute2 \
     net-tools \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama (using official install script)

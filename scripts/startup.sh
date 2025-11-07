@@ -126,8 +126,7 @@ start_webui() {
     log "INFO" "🌐 Starting Open WebUI..."
 
     # Start Open WebUI in background
-    cd /app 2>/dev/null || cd /
-    python3 -m open_webui --port ${WEBUI_PORT:-8080} > /tmp/webui.log 2>&1 &
+    open-webui serve --port ${WEBUI_PORT:-8080} > /tmp/webui.log 2>&1 &
     WEBUI_PID=$!
 
     log "INFO" "  • WebUI PID: $WEBUI_PID"
