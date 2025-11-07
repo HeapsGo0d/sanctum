@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  sanctum:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sanctum
+    privileged: true  # Required for iptables
+    ports:
+      - "8080:8080"   # Open WebUI
+      - "22:22"       # SSH (optional)
+    volumes:
+      - ./test-workspace:/workspace
+    environment:
+      # Ollama configuration
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/workspace/models
+      - OLLAMA_NUM_PARALLEL=2
+
+      # Open WebUI configuration
+      - DATA_DIR=/workspace/data
+      - WEBUI_AUTH=False
+      - WEBUI_PORT=8080
+
+      # Privacy configuration
+      - PRIVACY_MODE=enabled
+      - ALLOWED_DOMAINS=ollama.com,huggingface.co,registry.ollama.ai,ghcr.io
+
+    # GPU support (uncomment if running with NVIDIA GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
