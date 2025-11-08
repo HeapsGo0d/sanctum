@@ -76,6 +76,10 @@ setup_storage() {
 }
 
 setup_privacy() {
+    # Privacy approach: /etc/hosts blocklist only (simple and effective)
+    # - No iptables filtering (can't filter by domain names, only IPs)
+    # - No additional Python monitoring packages (psutil, httpx) needed
+    # - This keeps the image minimal and the privacy promise honest
     if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
         log "INFO" "🔒 Setting up privacy protections..."
 
@@ -120,7 +124,7 @@ start_webui() {
     log "INFO" "🌐 Starting Open WebUI..."
 
     # Start Open WebUI in background
-    open-webui serve --port ${WEBUI_PORT:-8080} > /tmp/webui.log 2>&1 &
+    open-webui serve --host 0.0.0.0 --port ${WEBUI_PORT:-8080} > /tmp/webui.log 2>&1 &
     WEBUI_PID=$!
 
     log "INFO" "  • WebUI PID: $WEBUI_PID"
