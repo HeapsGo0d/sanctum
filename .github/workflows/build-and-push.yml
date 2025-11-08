@@ -97,8 +97,8 @@ jobs:
           TAGS=$(curl -s -H "Authorization: JWT $TOKEN" \
             "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/sanctum/tags/?page_size=100" \
             | jq -r '.results | sort_by(.last_updated) | reverse | .[].name' \
-            | grep -E '^v[0-9]' \
-            | grep -v "^${CURRENT_TAG}$")
+            | { grep -E '^v[0-9]' || true; } \
+            | { grep -v "^${CURRENT_TAG}$" || true; })
 
           # Convert to array and keep only latest 3 (excluding current)
           TAG_ARRAY=($TAGS)
