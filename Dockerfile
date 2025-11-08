@@ -22,8 +22,7 @@ ENV DATA_DIR=/workspace/data \
     WEBUI_PORT=8080
 
 # Privacy configuration
-ENV PRIVACY_MODE=enabled \
-    ALLOWED_DOMAINS=ollama.com,huggingface.co,registry.ollama.ai,ghcr.io
+ENV PRIVACY_MODE=enabled
 
 # System dependencies + Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -32,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     gnupg \
     build-essential \
+    procps \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \

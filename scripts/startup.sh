@@ -36,7 +36,7 @@ log() {
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║           🔒 SANCTUM v1.0.0              ║"
+    log "INFO" "║           🔒 SANCTUM v1.0.1              ║"
     log "INFO" "║   Privacy-Focused Ollama + Open WebUI   ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
     log "INFO" ""
@@ -45,7 +45,6 @@ print_banner() {
 print_config() {
     log "INFO" "📋 Configuration:"
     log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
-    log "INFO" "  • Allowed Domains: ${ALLOWED_DOMAINS:-ollama.com,huggingface.co,registry.ollama.ai,ghcr.io}"
     log "INFO" "  • Ollama Models: /workspace/models"
     log "INFO" "  • WebUI Data: /workspace/data"
     log "INFO" "  • WebUI Port: ${WEBUI_PORT:-8080}"

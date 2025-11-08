@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 DOCKER_IMAGE="heapsgo0d/sanctum:latest"
 TEMPLATE_NAME="Sanctum - Privacy-Focused Ollama + Open WebUI"
-TEMPLATE_DESCRIPTION="Minimal, privacy-first Ollama + Open WebUI for RunPod. Network isolation, telemetry blocking, fast startup."
+TEMPLATE_DESCRIPTION="Minimal, privacy-first Ollama + Open WebUI for RunPod. Telemetry blocking, fast startup, clean architecture."
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-50}"
@@ -56,7 +56,7 @@ print_usage() {
 
     echo -e "${GREEN}Template includes:${NC}"
     echo "  ✅ Ollama + Open WebUI"
-    echo "  ✅ Privacy-first: network isolation + telemetry blocking"
+    echo "  ✅ Privacy-first: telemetry blocking via /etc/hosts"
     echo "  ✅ GPU support enabled"
     echo "  ✅ Persistent storage for models and data"
     echo ""
@@ -153,12 +153,6 @@ generate_template() {
       "publicPort": 8080,
       "type": "http",
       "description": "Open WebUI"
-    },
-    {
-      "privatePort": 22,
-      "publicPort": 22,
-      "type": "tcp",
-      "description": "SSH"
     }
   ],
   "volumeMounts": [
@@ -196,12 +190,7 @@ generate_template() {
     {
       "key": "PRIVACY_MODE",
       "value": "$PRIVACY_MODE",
-      "description": "Enable privacy protections (enabled/disabled)"
-    },
-    {
-      "key": "ALLOWED_DOMAINS",
-      "value": "ollama.com,huggingface.co,registry.ollama.ai,ghcr.io",
-      "description": "Allowed domains for network isolation"
+      "description": "Enable telemetry blocking (enabled/disabled)"
     }
   ],
   "startScript": "/scripts/startup.sh"
@@ -222,7 +211,7 @@ print_summary() {
     echo ""
     echo -e "${BLUE}Access:${NC}"
     echo "  Open WebUI: http://[pod-id]-8080.proxy.runpod.net"
-    echo "  SSH: ssh root@[pod-id]-ssh.proxy.runpod.net"
+    echo "  SSH: RunPod provides host-level SSH (see RunPod console)"
     echo ""
 }
 
@@ -244,16 +233,15 @@ deploy_template() {
   "volumeInGb": $VOLUME_GB,
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
-  "ports": "8080/http,22/tcp",
-  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Privacy-first architecture\\n- Network isolation with allowlist\\n- Telemetry blocking\\n- Persistent storage\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB",
+  "ports": "8080/http",
+  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Privacy-first: telemetry blocking via /etc/hosts\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB\\n\\n## Access\\n- Open WebUI: http://[pod-id]-8080.proxy.runpod.net\\n- SSH: RunPod provides host-level SSH automatically",
   "env": [
     {"key": "OLLAMA_HOST", "value": "0.0.0.0"},
     {"key": "OLLAMA_MODELS", "value": "/workspace/models"},
     {"key": "DATA_DIR", "value": "/workspace/data"},
     {"key": "WEBUI_AUTH", "value": "False"},
     {"key": "WEBUI_PORT", "value": "8080"},
-    {"key": "PRIVACY_MODE", "value": "$PRIVACY_MODE"},
-    {"key": "ALLOWED_DOMAINS", "value": "ollama.com,huggingface.co,registry.ollama.ai,ghcr.io"}
+    {"key": "PRIVACY_MODE", "value": "$PRIVACY_MODE"}
   ]
 }
 EOF

@@ -130,9 +130,9 @@ Access Open WebUI and download models through the UI:
 
 Models are stored in `/workspace/models` and persist across restarts.
 
-### Via SSH
+### Via SSH (RunPod Host-Level)
 
-SSH into pod and use Ollama CLI:
+SSH into your RunPod instance and use Ollama CLI:
 
 ```bash
 # Pull a model

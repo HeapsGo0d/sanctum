@@ -1,0 +1,180 @@
+# Sanctum - Project Context
+
+**Last Updated**: 2025-11-08
+**Current Version**: v1.0.1
+**Status**: Active Development
+
+## Project Philosophy
+
+**"Simple, Functional, Elegant"**
+
+Sanctum is designed to be the minimal, honest alternative to complex AI hosting templates. Core principles:
+
+- **Only implement what actually works** - No aspirational features that don't deliver
+- **Be honest about limitations** - Clear documentation about what we do/don't provide
+- **Minimal complexity** - 8 core files, no supervisor loops, no unnecessary services
+- **Fast startup** - Health checks with timeouts, no auto-downloads
+- **Privacy-first** - Block telemetry where possible, be transparent about scope
+
+## Architecture Decisions
+
+### Why Manual Ollama Installation?
+- **Decision**: Install Ollama via GitHub release tarball, not convenience script
+- **Reason**: Proper installation method, more control, aligns with minimal philosophy
+- **File**: `Dockerfile:48-52`
+
+### Why Python 3.11?
+- **Decision**: Use Python 3.11 from deadsnakes PPA
+- **Reason**: `open-webui` package requires Python 3.11+, Ubuntu 22.04 ships with 3.10
+- **File**: `Dockerfile:35-46`
+
+### Why /etc/hosts Only for Privacy?
+- **Decision**: Use `/etc/hosts` blocking for telemetry, NOT iptables network isolation
+- **Reason**: iptables cannot filter by domain names (only IPs), allowlist doesn't work
+- **Impact**: Removed `setup-network-isolation.sh`, removed `ALLOWED_DOMAINS` variable
+- **Honesty**: README clearly states "blocks telemetry domains" not "full network isolation"
+- **File**: `scripts/privacy/setup-blocklist.sh`
+
+### Why No Container SSH?
+- **Decision**: Don't install SSH server, remove port 22 from container
+- **Reason**: RunPod provides host-level SSH automatically, container SSH is redundant
+- **Impact**: Removed from docker-compose.yml, template.sh, and README
+- **File**: Multiple
+
+## Build History
+
+### Build Failures and Fixes
+
+1. **Ollama Download 404** (Build #2)
+   - Error: URL `https://ollama.com/download/ollama-linux-amd64` returned 404
+   - Fix: Switched to official install script (temporary)
+   - Final Fix: Manual binary from GitHub releases v0.5.4
+
+2. **Python Package Not Found** (Build #3)
+   - Error: `open-webui` package not found
+   - Fix: Installed Python 3.11 from deadsnakes PPA
+
+3. **GPG Configuration Error** (Build #4)
+   - Error: `gpg-agent` not found when adding PPA
+   - Fix: Added `gnupg` package before `add-apt-repository`
+
+4. **Python Wheel Build Failures** (Build #5)
+   - Error: `peewee` and `pypika` failed to build wheels
+   - Fix: Added `build-essential` and `python3.11-dev` packages
+
+5. **Setuptools Compatibility** (Build #6)
+   - Error: `AttributeError: install_layout` when building wheels
+   - Fix: Upgrade pip, setuptools, and wheel before installing open-webui
+   - **Result**: Build succeeded! ✅
+
+### Dependency Chain Learned
+```
+Ubuntu 22.04 base
+  → software-properties-common (for add-apt-repository)
+  → gnupg (for PPA key import)
+  → deadsnakes/ppa (for Python 3.11)
+  → python3.11 + python3.11-dev + python3.11-venv
+  → build-essential (gcc, make, etc.)
+  → pip3 upgrade (pip, setuptools, wheel)
+  → open-webui (finally installs!)
+```
+
+## Feedback Iterations
+
+### Initial Feedback (User Review)
+1. ✅ Ollama: Switch from convenience script to proper binary installation
+2. ✅ Privacy: Removed network isolation script (iptables can't filter domains)
+3. ✅ SSH: Removed port 22 exposure (no SSH server installed)
+4. ✅ GitHub Actions: Added step ID for digest output
+5. ✅ License: Added MIT LICENSE file
+
+### Second Feedback (Post-Build)
+1. **Privacy Confusion**: `ALLOWED_DOMAINS` still referenced but doesn't work → Remove
+2. **SSH Confusion**: Port 22 in compose/template but no server → Remove
+3. **Missing Tools**: `free` command not found, optional Python modules missing → Add procps
+4. **GitHub Actions**: Missing disk cleanup like Ignition has → Add cleanup steps
+5. **Versioning**: Need proper git tags (v1.0.0, v1.0.1, etc.) → Implement tagging
+
+## Current State
+
+### What's Working ✅
+- Docker builds successfully (Build #6)
+- Ollama installs via manual tarball extraction
+- Open WebUI installs with Python 3.11
+- /etc/hosts telemetry blocking works
+- Health checks with proper timeouts
+- GitHub Actions auto-builds on push
+
+### What's Deployed 🚀
+- Docker Hub: `heapsgo0d/sanctum:latest` (v1.0.0)
+- GitHub: `https://github.com/HeapsGo0d/sanctum`
+- Repository: Public, MIT licensed
+
+### Known Issues 🐛
+- `ALLOWED_DOMAINS` referenced but doesn't do anything (v1.0.1 will fix)
+- Port 22 exposed but unused (v1.0.1 will fix)
+- No git version tags yet (v1.0.1 will add)
+- GitHub Actions builds on every push, should be tag-based (v1.0.1 will fix)
+
+## File Structure
+
+```
+sanctum/
+├── CONTEXT.md                              # This file (project continuity)
+├── Dockerfile                              # Container definition
+├── README.md                               # User documentation
+├── LICENSE                                 # MIT License
+├── docker-compose.yml                      # Local testing
+├── template.sh                             # RunPod template generator
+├── sanctum_template.json                  # Generated template (gitignored)
+├── .github/workflows/build-and-push.yml   # CI/CD pipeline
+└── scripts/
+    ├── startup.sh                          # Main entrypoint
+    ├── health-check.sh                    # Service verification
+    └── privacy/
+        └── setup-blocklist.sh              # /etc/hosts blocking
+```
+
+## Lessons Learned
+
+### Technical
+1. **iptables can't filter by domain** - Only IPs, making allowlists impractical
+2. **Python packaging is fragile** - Need exact dependency chain for wheels to build
+3. **RunPod provides SSH** - No need for container-level SSH server
+4. **setuptools compatibility** - Always upgrade pip/setuptools/wheel first
+5. **/etc/hosts is simple and works** - Better than complex networking that doesn't
+
+### Process
+1. **Be honest about limitations** - Users appreciate transparency
+2. **Minimal is better** - Fewer services = faster startup, easier debugging
+3. **Test the build** - Each fix taught us something about dependencies
+4. **Document decisions** - This file exists because context matters
+
+## Next Steps (v1.0.1)
+
+### Immediate (This Session)
+- [x] Create CONTEXT.md
+- [ ] Remove ALLOWED_DOMAINS references
+- [ ] Remove SSH port 22 confusion
+- [ ] Add procps package
+- [ ] Update GitHub Actions (disk cleanup, tag-based triggers)
+- [ ] Tag v1.0.1 and trigger versioned build
+- [ ] Add privacy validation to blocklist script
+
+### Future Considerations
+- Monitor Docker Hub for "unrecognized" status (likely transient)
+- Consider optional Python modules (psutil, httpx) for advanced monitoring
+- Test on actual RunPod with GPU
+- Gather user feedback on privacy approach
+
+## References
+
+- **Original Inspiration**: Ignition (ComfyUI template) - `/home/nathan/dev/ignition`
+- **Docker Image**: https://hub.docker.com/r/heapsgo0d/sanctum
+- **GitHub Repo**: https://github.com/HeapsGo0d/sanctum
+- **Ollama Releases**: https://github.com/ollama/ollama/releases
+- **Open WebUI**: https://github.com/open-webui/open-webui
+
+---
+
+**Philosophy Reminder**: Simple, functional, elegant. Only promise what we deliver.

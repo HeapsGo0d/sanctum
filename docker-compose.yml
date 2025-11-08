@@ -6,10 +6,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: sanctum
-    privileged: true  # Required for iptables
+    privileged: true  # Required for /etc/hosts modification
     ports:
       - "8080:8080"   # Open WebUI
-      - "22:22"       # SSH (optional)
     volumes:
       - ./test-workspace:/workspace
     environment:
@@ -25,7 +24,6 @@ services:
 
       # Privacy configuration
       - PRIVACY_MODE=enabled
-      - ALLOWED_DOMAINS=ollama.com,huggingface.co,registry.ollama.ai,ghcr.io
 
     # GPU support (uncomment if running with NVIDIA GPU)
     # deploy:
