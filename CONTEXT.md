@@ -150,16 +150,20 @@ sanctum/
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
 
-## Next Steps (v1.0.1)
+## Completed (v1.0.1) ✅
 
-### Immediate (This Session)
+### Session 2025-11-08
 - [x] Create CONTEXT.md
-- [ ] Remove ALLOWED_DOMAINS references
-- [ ] Remove SSH port 22 confusion
-- [ ] Add procps package
-- [ ] Update GitHub Actions (disk cleanup, tag-based triggers)
-- [ ] Tag v1.0.1 and trigger versioned build
-- [ ] Add privacy validation to blocklist script
+- [x] Remove ALLOWED_DOMAINS references (Dockerfile, startup.sh, template.sh, docker-compose.yml)
+- [x] Remove SSH port 22 confusion (docker-compose.yml, template.sh, README.md)
+- [x] Add procps package to Dockerfile
+- [x] Update GitHub Actions (disk cleanup, tag-based triggers, old tag cleanup)
+- [x] Tag v1.0.1 and trigger versioned build (commit e0aa889, tag pushed)
+- [x] Add privacy validation to blocklist script (tests 3 sample domains)
+
+**Build Status**: Running (Build #7, triggered by v1.0.1 tag)
+
+## Next Steps (Future)
 
 ### Future Considerations
 - Monitor Docker Hub for "unrecognized" status (likely transient)
