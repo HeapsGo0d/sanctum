@@ -1,7 +1,7 @@
 # Sanctum - Project Context
 
 **Last Updated**: 2025-11-10
-**Current Version**: v1.0.3
+**Current Version**: v1.0.4
 **Status**: Active Development
 
 ## Project Philosophy
@@ -157,6 +157,16 @@ sanctum/
 2. **Minimal is better** - Fewer services = faster startup, easier debugging
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
+
+## Completed (v1.0.4) ✅
+
+### Session 2025-11-10 - Blocklist Validation Fix
+- [x] Fix blocklist validation to accept IPv6 null addresses (:: and ::0)
+- [x] Update validation logic to recognize both IPv4 (0.0.0.0) and IPv6 (::) as valid blocked states
+- [x] Improve validation messages to show actual resolved address
+
+**Issue**: Validation script incorrectly warned domains weren't blocked when they resolved to IPv6 null (::) instead of IPv4 null (0.0.0.0)
+**Fix**: Accept both address types as valid - blocking works correctly with either
 
 ## Completed (v1.0.3) ✅
 

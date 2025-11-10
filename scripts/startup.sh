@@ -36,7 +36,7 @@ log() {
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║           🔒 SANCTUM v1.0.3              ║"
+    log "INFO" "║           🔒 SANCTUM v1.0.4              ║"
     log "INFO" "║   Privacy-Focused Ollama + Open WebUI   ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
     log "INFO" ""

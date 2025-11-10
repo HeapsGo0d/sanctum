@@ -67,17 +67,18 @@ echo "✅ Telemetry blocklist active (${#BLOCKLIST[@]} domains, IPv4 + IPv6)"
 echo ""
 echo "🔍 Validating blocklist..."
 
-# Test sample domains to confirm they resolve to 0.0.0.0
+# Test sample domains to confirm they resolve to null addresses (0.0.0.0 or ::)
 SAMPLE_DOMAINS=("google-analytics.com" "segment.io" "sentry.io")
 VALIDATION_PASSED=true
 
 for domain in "${SAMPLE_DOMAINS[@]}"; do
-    # Check if domain resolves to 0.0.0.0 (blocked)
+    # Check if domain is in /etc/hosts
     if grep -q "0.0.0.0 $domain" /etc/hosts 2>/dev/null; then
-        # Verify DNS resolution points to 0.0.0.0
+        # Verify DNS resolution points to null address (IPv4 or IPv6)
         RESOLVED_IP=$(getent hosts "$domain" 2>/dev/null | awk '{print $1}' || echo "")
-        if [[ "$RESOLVED_IP" == "0.0.0.0" ]]; then
-            echo "  ✓ $domain → 0.0.0.0 (blocked)"
+        # Accept both 0.0.0.0 (IPv4) and :: or ::0 (IPv6) as valid blocked states
+        if [[ "$RESOLVED_IP" == "0.0.0.0" ]] || [[ "$RESOLVED_IP" == "::" ]] || [[ "$RESOLVED_IP" == "::0" ]]; then
+            echo "  ✓ $domain → $RESOLVED_IP (blocked)"
         else
             echo "  ⚠️  Warning: $domain in /etc/hosts but resolves to $RESOLVED_IP"
             VALIDATION_PASSED=false
@@ -89,7 +90,7 @@ for domain in "${SAMPLE_DOMAINS[@]}"; do
 done
 
 if [ "$VALIDATION_PASSED" = true ]; then
-    echo "✅ Blocklist validation successful - all domains resolve to 0.0.0.0"
+    echo "✅ Blocklist validation successful - all domains blocked"
 else
     echo "⚠️  Some domains may not be properly blocked (check /etc/hosts)"
 fi
