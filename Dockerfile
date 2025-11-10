@@ -46,8 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama (manual binary installation - proper method)
+# Version pinned for reproducible builds - review quarterly for updates
+ARG OLLAMA_VERSION=v0.12.10
 RUN curl -fsSL -o /tmp/ollama-linux-amd64.tgz \
-    https://github.com/ollama/ollama/releases/download/v0.5.4/ollama-linux-amd64.tgz \
+    https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/ollama-linux-amd64.tgz \
     && tar -C /usr -xzf /tmp/ollama-linux-amd64.tgz \
     && rm /tmp/ollama-linux-amd64.tgz
 

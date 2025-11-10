@@ -1,7 +1,7 @@
 # Sanctum - Project Context
 
 **Last Updated**: 2025-11-10
-**Current Version**: v1.0.2
+**Current Version**: v1.0.3
 **Status**: Active Development
 
 ## Project Philosophy
@@ -40,6 +40,14 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Reason**: RunPod provides host-level SSH automatically, container SSH is redundant
 - **Impact**: Removed from docker-compose.yml, template.sh, and README
 - **File**: Multiple
+
+### Why Pinned Ollama Version?
+- **Decision**: Pin Ollama to specific version (v0.12.10), not dynamic "latest"
+- **Reason**: Reproducible builds, simple to understand, no API rate limits or failures
+- **Philosophy**: Aligns with "simple, functional, elegant" - one-line version updates
+- **Maintenance**: Review quarterly or when important updates announced
+- **Current**: v0.12.10 (updated 2025-11-10)
+- **File**: `Dockerfile:50`
 
 ## Build History
 
@@ -149,6 +157,17 @@ sanctum/
 2. **Minimal is better** - Fewer services = faster startup, easier debugging
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
+
+## Completed (v1.0.3) ✅
+
+### Session 2025-11-10 - Ollama Version Update
+- [x] Update Ollama from v0.5.4 to v0.12.10 (8 minor versions, ~1 year of improvements)
+- [x] Add ARG-based version pinning to Dockerfile (reproducible builds)
+- [x] Document versioning approach in CONTEXT.md (simple, quarterly review schedule)
+- [x] Add comment for quarterly version review
+
+**Changes**: Dockerfile ARG approach, CONTEXT.md architecture decision
+**Benefits**: Latest embeddings, vision models, CPU performance fixes, new model support
 
 ## Completed (v1.0.2) ✅
 
