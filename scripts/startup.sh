@@ -36,7 +36,7 @@ log() {
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║           🔒 SANCTUM v1.0.1              ║"
+    log "INFO" "║           🔒 SANCTUM v1.0.2              ║"
     log "INFO" "║   Privacy-Focused Ollama + Open WebUI   ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
     log "INFO" ""
@@ -44,7 +44,11 @@ print_banner() {
 
 print_config() {
     log "INFO" "📋 Configuration:"
-    log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
+    if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
+        log "INFO" "  • Privacy Mode: enabled (20 domains blocked)"
+    else
+        log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
+    fi
     log "INFO" "  • Ollama Models: /workspace/models"
     log "INFO" "  • WebUI Data: /workspace/data"
     log "INFO" "  • WebUI Port: ${WEBUI_PORT:-8080}"
@@ -160,6 +164,11 @@ print_success() {
     else
         log "INFO" "  ⚠ Privacy protections disabled"
     fi
+    log "INFO" ""
+    log "INFO" "💡 Next Steps:"
+    log "INFO" "  1. Open the WebUI URL above"
+    log "INFO" "  2. Go to Settings → Models → Pull Model"
+    log "INFO" "  3. Start with a small model like llama3.2:1b"
     log "INFO" ""
 }
 

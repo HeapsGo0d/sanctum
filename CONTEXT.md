@@ -1,7 +1,7 @@
 # Sanctum - Project Context
 
-**Last Updated**: 2025-11-08
-**Current Version**: v1.0.1
+**Last Updated**: 2025-11-10
+**Current Version**: v1.0.2
 **Status**: Active Development
 
 ## Project Philosophy
@@ -150,6 +150,16 @@ sanctum/
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
 
+## Completed (v1.0.2) ✅
+
+### Session 2025-11-10 - Polish & UX Improvements
+- [x] Remove psutil/httpx mention from CONTEXT.md (documentation accuracy)
+- [x] Add blocked domain count to startup log (shows "20 domains blocked")
+- [x] Add model download helper message (guides first-time users)
+- [x] Improve blocklist validation (uses getent instead of curl for clarity)
+
+**Changes**: 4 files, +25/-11 lines - all polish improvements aligned with "simple, functional, elegant"
+
 ## Completed (v1.0.1) ✅
 
 ### Session 2025-11-08
@@ -161,13 +171,12 @@ sanctum/
 - [x] Tag v1.0.1 and trigger versioned build (commit e0aa889, tag pushed)
 - [x] Add privacy validation to blocklist script (tests 3 sample domains)
 
-**Build Status**: Running (Build #7, triggered by v1.0.1 tag)
+**Build Status**: Completed (Build #7, triggered by v1.0.1 tag)
 
 ## Next Steps (Future)
 
 ### Future Considerations
 - Monitor Docker Hub for "unrecognized" status (likely transient)
-- Consider optional Python modules (psutil, httpx) for advanced monitoring
 - Test on actual RunPod with GPU
 - Gather user feedback on privacy approach
 
