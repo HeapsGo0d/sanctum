@@ -36,7 +36,7 @@ log() {
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║           🔒 SANCTUM v1.0.4              ║"
+    log "INFO" "║           🔒 SANCTUM v1.0.5              ║"
     log "INFO" "║   Privacy-Focused Ollama + Open WebUI   ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
     log "INFO" ""
@@ -45,10 +45,11 @@ print_banner() {
 print_config() {
     log "INFO" "📋 Configuration:"
     if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
-        log "INFO" "  • Privacy Mode: enabled (20 domains blocked)"
+        log "INFO" "  • Privacy Mode: enabled (22 domains blocked)"
     else
         log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
     fi
+    log "INFO" "  • Ollama Cloud: disabled (OLLAMA_NO_CLOUD=1)"
     log "INFO" "  • Ollama Models: /workspace/models"
     log "INFO" "  • WebUI Data: /workspace/data"
     log "INFO" "  • WebUI Port: ${WEBUI_PORT:-8080}"
@@ -161,6 +162,7 @@ print_success() {
     if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
         log "INFO" "  ✓ Telemetry blocking enabled"
         log "INFO" "  ✓ Analytics domains blocked via /etc/hosts"
+        log "INFO" "  ✓ Ollama cloud features disabled (OLLAMA_NO_CLOUD=1)"
     else
         log "INFO" "  ⚠ Privacy protections disabled"
     fi

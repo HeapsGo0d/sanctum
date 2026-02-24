@@ -14,12 +14,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Ollama configuration
 ENV OLLAMA_HOST=0.0.0.0 \
     OLLAMA_MODELS=/workspace/models \
-    OLLAMA_NUM_PARALLEL=2
+    OLLAMA_NUM_PARALLEL=2 \
+    OLLAMA_NO_CLOUD=1
 
 # Open WebUI configuration
 ENV DATA_DIR=/workspace/data \
     WEBUI_AUTH=False \
-    WEBUI_PORT=8080
+    WEBUI_PORT=8080 \
+    SCARF_NO_ANALYTICS=true \
+    DO_NOT_TRACK=true \
+    ANONYMIZED_TELEMETRY=false \
+    AUDIT_LOG_LEVEL=NONE \
+    ENABLE_AUDIT_LOGS_FILE=false
 
 # Privacy configuration
 ENV PRIVACY_MODE=enabled

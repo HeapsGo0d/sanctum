@@ -44,6 +44,11 @@ BLOCKLIST=(
     "piwik.org"
     "heap.io"
     "intercom.io"
+
+    # Ollama cloud / update check (best-effort - domains may change)
+    "ollama.ai"
+    "updates.ollama.ai"
+    "telemetry.ollama.ai"
 )
 
 # Add blocklist entries (IPv4 + IPv6)

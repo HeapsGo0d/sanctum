@@ -1,7 +1,7 @@
 # Sanctum - Project Context
 
-**Last Updated**: 2025-11-10
-**Current Version**: v1.0.4
+**Last Updated**: 2026-02-24
+**Current Version**: v1.0.5
 **Status**: Active Development
 
 ## Project Philosophy
@@ -40,6 +40,24 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Reason**: RunPod provides host-level SSH automatically, container SSH is redundant
 - **Impact**: Removed from docker-compose.yml, template.sh, and README
 - **File**: Multiple
+
+### Why OLLAMA_NO_CLOUD=1?
+- **Decision**: Set `OLLAMA_NO_CLOUD=1` explicitly in the Dockerfile Ollama ENV block
+- **Reason**: Ollama added phone-home behavior (update checks) that has no simple opt-out until this env var was introduced. Don't rely on upstream defaults — they can change.
+- **Important**: This disables Ollama's cloud features; it does NOT replace egress-level network control. Initial model pulls still require network access unless models are preloaded.
+- **File**: `Dockerfile:15-18`
+
+### Why Explicit Open WebUI Telemetry-Off Vars?
+- **Decision**: Set `SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true`, `ANONYMIZED_TELEMETRY=false` explicitly; also `AUDIT_LOG_LEVEL=NONE` and `ENABLE_AUDIT_LOGS_FILE=false`
+- **Reason**: Open WebUI's upstream Chromadb dependency sends PostHog telemetry by default. Official Dockerfile sets these vars — Sanctum should too, not rely on inherited defaults (fragile).
+- **Audit logs**: Disabled to prevent Open WebUI from writing audit data to `/workspace/data` (mounted persistent volume).
+- **File**: `Dockerfile:20-27`
+
+### Why Ollama Domains in Blocklist?
+- **Decision**: Add `ollama.ai`, `updates.ollama.ai`, `telemetry.ollama.ai` to the `/etc/hosts` blocklist
+- **Reason**: Belt-and-suspenders. `OLLAMA_NO_CLOUD=1` is the primary control; `/etc/hosts` is the network-level backstop — consistent with Sanctum's existing privacy philosophy.
+- **Acknowledged limitation**: Domains are best-effort. If Ollama changes endpoints, this list won't catch new ones. The env var is more reliable.
+- **File**: `scripts/privacy/setup-blocklist.sh:47-49`
 
 ### Why Pinned Ollama Version?
 - **Decision**: Pin Ollama to specific version (v0.12.10), not dynamic "latest"
@@ -157,6 +175,19 @@ sanctum/
 2. **Minimal is better** - Fewer services = faster startup, easier debugging
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
+
+## Completed (v1.0.5) ✅
+
+### Session 2026-02-24 - Privacy Hardening (Option A+)
+- [x] Add `OLLAMA_NO_CLOUD=1` to Dockerfile Ollama ENV block
+- [x] Add Open WebUI telemetry-off vars (`SCARF_NO_ANALYTICS`, `DO_NOT_TRACK`, `ANONYMIZED_TELEMETRY`, `AUDIT_LOG_LEVEL`, `ENABLE_AUDIT_LOGS_FILE`) to Dockerfile
+- [x] Add Ollama cloud domains to blocklist (`ollama.ai`, `updates.ollama.ai`, `telemetry.ollama.ai`)
+- [x] Update `print_config()` to surface Ollama cloud status and corrected domain count (22)
+- [x] Update `print_success()` privacy status block with Ollama cloud line
+- [x] Document all three privacy decisions as architecture decisions in CONTEXT.md
+
+**Issue**: Sanctum relied on upstream defaults for Ollama/Open WebUI privacy settings — fragile and undocumented
+**Fix**: Explicit env vars + belt-and-suspenders blocklist entries; all decisions documented with rationale and acknowledged limitations
 
 ## Completed (v1.0.4) ✅
 
