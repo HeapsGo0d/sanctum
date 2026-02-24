@@ -21,6 +21,7 @@ ENV OLLAMA_HOST=0.0.0.0 \
 ENV DATA_DIR=/workspace/data \
     WEBUI_AUTH=False \
     WEBUI_PORT=8080 \
+    OLLAMA_BASE_URL=http://127.0.0.1:11434 \
     SCARF_NO_ANALYTICS=true \
     DO_NOT_TRACK=true \
     ANONYMIZED_TELEMETRY=false \

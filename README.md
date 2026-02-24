@@ -6,7 +6,7 @@ Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI wit
 
 ## ✨ Features
 
-- **🔒 Privacy-First**: Telemetry blocking via /etc/hosts (20+ analytics domains)
+- **🔒 Privacy-First**: Telemetry blocking via /etc/hosts (22 analytics domains)
 - **⚡ Fast Startup**: Two services, no unnecessary operations
 - **🎯 Minimal**: Clean architecture, essential functionality only
 - **💾 Persistent Storage**: Models and data survive pod restarts
@@ -74,6 +74,7 @@ grep "0.0.0.0" /etc/hosts
 | `OLLAMA_HOST` | `0.0.0.0` | Ollama server bind address |
 | `OLLAMA_MODELS` | `/workspace/models` | Ollama models directory |
 | `OLLAMA_NUM_PARALLEL` | `2` | Number of parallel requests |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API URL for Open WebUI |
 | `DATA_DIR` | `/workspace/data` | Open WebUI data directory |
 | `WEBUI_AUTH` | `False` | Enable Open WebUI authentication |
 | `WEBUI_PORT` | `8080` | Open WebUI port |
@@ -122,11 +123,28 @@ Set volume size in template or RunPod UI:
 
 ### Download Models
 
-Access Open WebUI and download models through the UI:
+When you first open Open WebUI you'll see "No models available" — this is expected. Ollama is running but has no models downloaded yet.
 
-1. Open http://[pod-id]-8080.proxy.runpod.net
-2. Go to Settings → Models
-3. Pull models (e.g., `llama2`, `mistral`, `codellama`)
+**Via the UI:**
+1. Click the model selector dropdown at the top
+2. Type a model name and click **Search Ollama.com** — or —
+3. Go to **Admin Panel** → **Settings** → **Models**, enter a model name in the pull field, and click the download button
+
+**Via the terminal** (faster for large models):
+```bash
+# Shell into the container
+docker exec -it <container_id> bash
+
+# Pull any model by its Ollama Hub name
+ollama pull llama3.2:3b
+ollama pull mistral:7b
+ollama pull qwen2.5:7b
+
+# List downloaded models
+ollama list
+```
+
+Browse available models at https://ollama.com/library. Use the full `name:tag` format when pulling (e.g. `llama3.2:3b`, not just `llama3.2`).
 
 Models are stored in `/workspace/models` and persist across restarts.
 
