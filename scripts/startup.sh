@@ -36,19 +36,16 @@ log() {
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║           🔒 SANCTUM v1.0.5              ║"
+    log "INFO" "║              🔒 SANCTUM                  ║"
     log "INFO" "║   Privacy-Focused Ollama + Open WebUI   ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
+    log "INFO" "                                ${SANCTUM_VERSION:-dev}"
     log "INFO" ""
 }
 
 print_config() {
     log "INFO" "📋 Configuration:"
-    if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
-        log "INFO" "  • Privacy Mode: enabled (22 domains blocked)"
-    else
-        log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
-    fi
+    log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
     log "INFO" "  • Ollama Cloud: disabled (OLLAMA_NO_CLOUD=1)"
     log "INFO" "  • Ollama Models: /workspace/models"
     log "INFO" "  • WebUI Data: /workspace/data"
@@ -135,16 +132,17 @@ start_webui() {
     log "INFO" "  • WebUI PID: $WEBUI_PID"
     log "INFO" "  • Waiting for WebUI to be ready..."
 
-    # Wait for Open WebUI (max 30 seconds)
-    for i in {1..30}; do
-        if curl -sf http://localhost:${WEBUI_PORT:-8080} > /dev/null 2>&1; then
+    # Wait for Open WebUI (max 120 seconds - first boot runs DB migrations
+    # and fetches the embedding model)
+    for i in {1..120}; do
+        if curl -sf http://localhost:${WEBUI_PORT:-8080}/health > /dev/null 2>&1; then
             log "INFO" "  ✓ Open WebUI ready on port ${WEBUI_PORT:-8080}"
             return 0
         fi
         sleep 1
     done
 
-    log "ERROR" "❌ Open WebUI failed to start within 30 seconds"
+    log "ERROR" "❌ Open WebUI failed to start within 120 seconds"
     log "ERROR" "Last 20 lines of WebUI log:"
     tail -20 /tmp/webui.log
     exit 1
@@ -174,6 +172,17 @@ print_success() {
     log "INFO" ""
 }
 
+# Shut down both services on signal or on exit
+cleanup() {
+    [[ "${CLEANUP_DONE:-false}" == "true" ]] && return
+    CLEANUP_DONE=true
+    log "INFO" "🛑 Shutting down Sanctum..."
+    kill "${WEBUI_PID:-}" "${OLLAMA_PID:-}" 2>/dev/null || true
+    wait 2>/dev/null || true
+}
+
+trap 'cleanup; exit 0' SIGTERM SIGINT
+
 # Main execution
 main() {
     print_banner
@@ -188,8 +197,16 @@ main() {
     log "INFO" "🔄 Container running - press Ctrl+C to stop"
     log "INFO" ""
 
-    # Keep container alive
-    tail -f /dev/null
+    # Supervise: return as soon as either service exits, so a dead service
+    # takes the container down instead of leaving a zombie pod running.
+    wait -n "$OLLAMA_PID" "$WEBUI_PID" || true
+
+    log "ERROR" ""
+    log "ERROR" "❌ A service exited unexpectedly"
+    log "ERROR" "Last 20 lines of each log:"
+    tail -20 /tmp/ollama.log /tmp/webui.log 2>/dev/null || true
+    cleanup
+    exit 1
 }
 
 main "$@"

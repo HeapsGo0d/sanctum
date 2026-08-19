@@ -31,6 +31,10 @@ ENV DATA_DIR=/workspace/data \
 # Privacy configuration
 ENV PRIVACY_MODE=enabled
 
+# Sanctum version (stamped by CI from the git tag; "dev" for local builds)
+ARG SANCTUM_VERSION=dev
+ENV SANCTUM_VERSION=${SANCTUM_VERSION}
+
 # System dependencies + Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -46,25 +50,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-venv \
     python3.11-dev \
     python3-pip \
-    iptables \
-    iproute2 \
-    net-tools \
+    zstd \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama (manual binary installation - proper method)
 # Version pinned for reproducible builds - review quarterly for updates
-ARG OLLAMA_VERSION=v0.12.10
-RUN curl -fsSL -o /tmp/ollama-linux-amd64.tgz \
-    https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/ollama-linux-amd64.tgz \
-    && tar -C /usr -xzf /tmp/ollama-linux-amd64.tgz \
-    && rm /tmp/ollama-linux-amd64.tgz
-
-# Upgrade pip, setuptools, and wheel for compatibility
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+# Note: upstream switched the linux asset from .tgz to .tar.zst - see CONTEXT.md
+ARG OLLAMA_VERSION=v0.32.14
+RUN curl -fsSL -o /tmp/ollama.tar.zst \
+    https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst \
+    && tar -C /usr --zstd -xf /tmp/ollama.tar.zst \
+    && rm /tmp/ollama.tar.zst \
+    && test -x /usr/bin/ollama
 
 # Install Open WebUI
-RUN pip3 install --no-cache-dir open-webui
+# CPU-only torch goes in first so pip never pulls the CUDA build that
+# sentence-transformers would otherwise drag in (~4.5GB). Ollama owns GPU
+# inference and ships its own CUDA runtime - see CONTEXT.md.
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && python3.11 -m pip install --no-cache-dir torch \
+    --index-url https://download.pytorch.org/whl/cpu \
+    && python3.11 -m pip install --no-cache-dir open-webui \
+    && python3.11 -c "import torch; assert torch.__version__.endswith('+cpu'), 'CUDA torch leaked in: ' + torch.__version__"
 
 # Create workspace directories
 RUN mkdir -p /workspace/models /workspace/data /scripts/privacy
@@ -75,7 +83,7 @@ RUN chmod +x /scripts/*.sh /scripts/privacy/*.sh
 
 # Expose ports
 # 8080 - Open WebUI (HTTP)
-# 11434 - Ollama API (internal, not exposed)
+# 11434 - Ollama API (bound on 0.0.0.0 but deliberately not EXPOSEd or proxied)
 EXPOSE 8080
 
 # Health check

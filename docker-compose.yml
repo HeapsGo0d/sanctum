@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   sanctum:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        SANCTUM_VERSION: dev
     container_name: sanctum
     privileged: true  # Required for /etc/hosts modification
     ports:
@@ -12,17 +12,8 @@ services:
     volumes:
       - ./test-workspace:/workspace
     environment:
-      # Ollama configuration
-      - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_MODELS=/workspace/models
-      - OLLAMA_NUM_PARALLEL=2
-
-      # Open WebUI configuration
-      - DATA_DIR=/workspace/data
-      - WEBUI_AUTH=False
-      - WEBUI_PORT=8080
-
-      # Privacy configuration
+      # Only overrides belong here. Ollama, Open WebUI and the telemetry-off
+      # vars are all set in the Dockerfile - duplicating them lets the two drift.
       - PRIVACY_MODE=enabled
 
     # GPU support (uncomment if running with NVIDIA GPU)

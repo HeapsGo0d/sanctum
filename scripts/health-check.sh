@@ -11,7 +11,7 @@ if ! curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
 fi
 
 # Check Open WebUI
-if ! curl -sf http://localhost:${WEBUI_PORT:-8080} > /dev/null 2>&1; then
+if ! curl -sf http://localhost:${WEBUI_PORT:-8080}/health > /dev/null 2>&1; then
     echo "❌ Open WebUI health check failed"
     exit 1
 fi

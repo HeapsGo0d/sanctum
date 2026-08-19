@@ -66,6 +66,7 @@ jobs:
           # Optimize for space and speed
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            SANCTUM_VERSION=${{ github.ref_name }}
 
       - name: Image digest
         run: echo ${{ steps.meta.outputs.digest }}

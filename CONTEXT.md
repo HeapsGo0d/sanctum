@@ -1,7 +1,7 @@
 # Sanctum - Project Context
 
-**Last Updated**: 2026-02-24
-**Current Version**: v1.0.5
+**Last Updated**: 2026-08-19
+**Current Version**: v1.1.0
 **Status**: Active Development
 
 ## Project Philosophy
@@ -21,12 +21,12 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 ### Why Manual Ollama Installation?
 - **Decision**: Install Ollama via GitHub release tarball, not convenience script
 - **Reason**: Proper installation method, more control, aligns with minimal philosophy
-- **File**: `Dockerfile:48-52`
+- **File**: `Dockerfile:57-65`
 
 ### Why Python 3.11?
 - **Decision**: Use Python 3.11 from deadsnakes PPA
 - **Reason**: `open-webui` package requires Python 3.11+, Ubuntu 22.04 ships with 3.10
-- **File**: `Dockerfile:35-46`
+- **File**: `Dockerfile:38-55`
 
 ### Why /etc/hosts Only for Privacy?
 - **Decision**: Use `/etc/hosts` blocking for telemetry, NOT iptables network isolation
@@ -51,21 +51,47 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Decision**: Set `SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true`, `ANONYMIZED_TELEMETRY=false` explicitly; also `AUDIT_LOG_LEVEL=NONE` and `ENABLE_AUDIT_LOGS_FILE=false`
 - **Reason**: Open WebUI's upstream Chromadb dependency sends PostHog telemetry by default. Official Dockerfile sets these vars — Sanctum should too, not rely on inherited defaults (fragile).
 - **Audit logs**: Disabled to prevent Open WebUI from writing audit data to `/workspace/data` (mounted persistent volume).
-- **File**: `Dockerfile:20-27`
+- **File**: `Dockerfile:21-29`
 
 ### Why Ollama Domains in Blocklist?
 - **Decision**: Add `ollama.ai`, `updates.ollama.ai`, `telemetry.ollama.ai` to the `/etc/hosts` blocklist
 - **Reason**: Belt-and-suspenders. `OLLAMA_NO_CLOUD=1` is the primary control; `/etc/hosts` is the network-level backstop — consistent with Sanctum's existing privacy philosophy.
 - **Acknowledged limitation**: Domains are best-effort. If Ollama changes endpoints, this list won't catch new ones. The env var is more reliable.
-- **File**: `scripts/privacy/setup-blocklist.sh:47-49`
+- **File**: `scripts/privacy/setup-blocklist.sh:48-51`
 
 ### Why Pinned Ollama Version?
-- **Decision**: Pin Ollama to specific version (v0.12.10), not dynamic "latest"
+- **Decision**: Pin Ollama to specific version (v0.32.14), not dynamic "latest"
 - **Reason**: Reproducible builds, simple to understand, no API rate limits or failures
 - **Philosophy**: Aligns with "simple, functional, elegant" - one-line version updates
 - **Maintenance**: Review quarterly or when important updates announced
-- **Current**: v0.12.10 (updated 2025-11-10)
-- **File**: `Dockerfile:50`
+- **Current**: v0.32.14 (updated 2026-08-19)
+- **File**: `Dockerfile:60`
+
+### Why `.tar.zst` for the Ollama Download?
+- **Decision**: Extract Ollama from `ollama-linux-amd64.tar.zst` with `tar --zstd`, and add `zstd` to the apt list
+- **Reason**: Upstream stopped publishing `ollama-linux-amd64.tgz` for current releases — the official `install.sh` now downloads `.tar.zst` and errors out if `zstd` is missing. A plain `OLLAMA_VERSION` bump would have 404'd
+- **Layout**: Unchanged — extracting to `/usr` still yields `/usr/bin/ollama` and `/usr/lib/ollama`. A `test -x /usr/bin/ollama` guards the build against a future layout change
+- **File**: `Dockerfile:57-65`
+
+### Why CPU-Only PyTorch?
+- **Decision**: Install `torch` from the PyTorch CPU index *before* `open-webui`, in the same `RUN` layer
+- **Reason**: `open-webui` → `sentence-transformers` → `torch` pulls the CUDA build plus `nvidia-*` wheels, roughly 4.5GB. Ollama does all inference and ships its own CUDA runtime in its release tarball, so those wheels were never used
+- **Why it works**: `sentence-transformers` only requires `torch>=1.11.0` (no exact pin anywhere in the dependency tree), so pip treats the pre-installed CPU build as satisfying the requirement
+- **Trade-off, stated honestly**: local RAG embeddings and Whisper transcription now run on CPU. Users who want GPU embeddings set `RAG_EMBEDDING_ENGINE=ollama` and pull an embedding model — documented in the README
+- **Guard**: the build asserts `torch.__version__` ends in `+cpu`, so a future dependency change that drags CUDA torch back in fails the build instead of silently shipping a 7GB image
+- **File**: `Dockerfile:69-75`
+
+### Why `wait -n` Instead of `tail -f /dev/null`?
+- **Decision**: Supervise both children with `wait -n`, and trap `SIGTERM`/`SIGINT` to shut them down
+- **Reason**: `tail -f /dev/null` kept PID 1 alive no matter what. If Ollama or Open WebUI crashed, the pod stayed "running" with a dead service — Docker's `HEALTHCHECK` records this but RunPod does not act on it, so the failure was invisible until someone opened the UI
+- **Behaviour**: either service exiting now prints the tail of both logs and exits 1, so the pod visibly stops
+- **Not a supervisor**: there is deliberately no restart loop. Sanctum's premise is one container, no supervision framework — a crash should surface, not be papered over
+- **File**: `scripts/startup.sh:176-210`
+
+### Why Is the Version a Build ARG?
+- **Decision**: `ARG SANCTUM_VERSION` → `ENV SANCTUM_VERSION`, stamped by CI from `github.ref_name`, printed by the startup banner
+- **Reason**: the banner was a hardcoded string and had already drifted (said v1.0.5 while the repo was tagged v1.0.6). One source of truth, no release-checklist step to forget
+- **File**: `Dockerfile:35-36`, `.github/workflows/build-and-push.yml`
 
 ## Build History
 
@@ -132,15 +158,12 @@ Ubuntu 22.04 base
 - GitHub Actions auto-builds on push
 
 ### What's Deployed 🚀
-- Docker Hub: `heapsgo0d/sanctum:latest` (v1.0.0)
+- Docker Hub: `heapsgo0d/sanctum:latest` (v1.1.0)
 - GitHub: `https://github.com/HeapsGo0d/sanctum`
 - Repository: Public, MIT licensed
 
 ### Known Issues 🐛
-- `ALLOWED_DOMAINS` referenced but doesn't do anything (v1.0.1 will fix)
-- Port 22 exposed but unused (v1.0.1 will fix)
-- No git version tags yet (v1.0.1 will add)
-- GitHub Actions builds on every push, should be tag-based (v1.0.1 will fix)
+- None outstanding. All v1.0.x issues resolved; see the v1.1.0 section below
 
 ## File Structure
 
@@ -152,7 +175,7 @@ sanctum/
 ├── LICENSE                                 # MIT License
 ├── docker-compose.yml                      # Local testing
 ├── template.sh                             # RunPod template generator
-├── sanctum_template.json                  # Generated template (gitignored)
+├── sanctum_template.json                  # Generated by template.sh (gitignored, untracked)
 ├── .github/workflows/build-and-push.yml   # CI/CD pipeline
 └── scripts/
     ├── startup.sh                          # Main entrypoint
@@ -175,6 +198,39 @@ sanctum/
 2. **Minimal is better** - Fewer services = faster startup, easier debugging
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
+
+## Completed (v1.1.0) ✅
+
+### Session 2026-08-19 - Review, Dependency Update, Release
+
+Full code review after six idle months, then the updates it turned up.
+
+**Updates**
+- [x] Ollama v0.12.10 → v0.32.14, including the `.tgz` → `.tar.zst` asset-format change
+- [x] Open WebUI rebuilt against latest PyPI (0.11.0 — full UI redesign). Deliberately left unpinned
+- [x] CPU-only PyTorch — drops the unused CUDA wheels from the image
+
+**Fixes found by review**
+- [x] `tail -f /dev/null` → `wait -n` supervision + signal trap (a crashed service left a zombie pod)
+- [x] Health check and startup probe now hit `/health`, not `/` (the SPA shell can 200 with a dead backend)
+- [x] Open WebUI readiness budget 30s → 120s (first boot runs DB migrations)
+- [x] Startup banner version now comes from a build ARG (was hardcoded, had drifted to v1.0.5)
+- [x] Dropped the hardcoded "22 domains blocked" string — `setup-blocklist.sh` already prints the real count
+- [x] Removed `iptables`, `iproute2`, `net-tools` — dead since the v1.0.1 network-isolation removal, and they implied a filtering capability Sanctum doesn't have
+- [x] `pip3` → `python3.11 -m pip` (explicit interpreter, not dependent on update-alternatives ordering)
+- [x] `docker-compose.yml`: dropped the obsolete `version:` key and the partial env duplication that had already drifted from the Dockerfile
+
+**template.sh**
+- [x] REST API (`POST https://rest.runpod.io/v1/templates`) with the legacy GraphQL mutation as fallback
+- [x] ignition-style argument parsing: `--deploy`/`-d`, `--yes`/`-y`, bare `v*` version
+
+**Privacy**: unchanged. All 22 blocklist domains, IPv4+IPv6 entries, validation, and every
+telemetry-off env var carried over untouched.
+
+**Checked, no action needed**: the CI `latest` tag does publish on tag pushes (Docker Hub
+shows `latest` and `v1.0.6` written in the same second); `AUDIT_LOG_LEVEL` and
+`ENABLE_AUDIT_LOGS_FILE` still exist in Open WebUI 0.11.0's `env.py`; Python 3.11 still
+satisfies its `>=3.11,<3.13` requirement.
 
 ## Completed (v1.0.5) ✅
 

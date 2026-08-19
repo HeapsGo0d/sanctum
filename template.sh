@@ -1,6 +1,11 @@
 #!/bin/bash
 # Sanctum RunPod Template Creator
-# Generates RunPod template configuration for Sanctum
+# Generates RunPod template configuration for Sanctum, and optionally creates
+# it directly via the RunPod API.
+#
+#   ./template.sh                      # generate sanctum_template.json only
+#   ./template.sh --deploy             # prompt, then create the template
+#   ./template.sh -y v1.1.0 --deploy   # non-interactive, uses defaults
 
 set -e
 
@@ -14,25 +19,36 @@ NC='\033[0m' # No Color
 
 # Configuration
 DOCKER_IMAGE="heapsgo0d/sanctum:latest"
-TEMPLATE_NAME="Sanctum - Privacy-Focused Ollama + Open WebUI"
+TEMPLATE_NAME="Sanctum Latest"
 TEMPLATE_DESCRIPTION="Minimal, privacy-first Ollama + Open WebUI for RunPod. Telemetry blocking, fast startup, clean architecture."
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-50}"
 VOLUME_GB="${VOLUME_GB:-20}"
 
-# Check for command line arguments
-DEPLOY_MODE="local"  # Default to local file generation
-if [[ "$1" == "--deploy" || "$1" == "-d" ]]; then
-    DEPLOY_MODE="api"
-fi
+# RunPod API endpoints
+RUNPOD_REST_URL="https://rest.runpod.io/v1/templates"
+RUNPOD_GRAPHQL_URL="https://api.runpod.io/graphql"
+
+# Parse command line arguments
+DEPLOY_MODE="local"
+YES_MODE=false
+VERSION_ARG=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --deploy|-d) DEPLOY_MODE="api" ;;
+        --yes|-y)    YES_MODE=true ;;
+        v*)          VERSION_ARG="$arg" ;;
+    esac
+done
 
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
     echo "╔═══════════════════════════════════════════╗"
     echo "║          🔒 SANCTUM TEMPLATE             ║"
-    echo "║       RunPod Template Creator v1.0        ║"
+    echo "║       RunPod Template Creator v1.1        ║"
     echo "╚═══════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -50,7 +66,9 @@ print_usage() {
         echo ""
     else
         echo -e "${BLUE}📁 Local File Mode${NC} - Will generate files for manual upload"
-        echo -e "${YELLOW}💡 Tip: Use './template.sh --deploy' for automatic deployment${NC}"
+        echo -e "${YELLOW}💡 Tips:${NC}"
+        echo "  • './template.sh --deploy' for automatic RunPod deployment"
+        echo "  • './template.sh -y v1.1.0 --deploy' to skip all prompts"
         echo ""
     fi
 
@@ -65,7 +83,7 @@ print_usage() {
 # Check API key if in deploy mode
 check_api_requirements() {
     if [[ "$DEPLOY_MODE" == "api" ]]; then
-        if [[ -z "$RUNPOD_API_KEY" ]]; then
+        if [[ -z "${RUNPOD_API_KEY:-}" ]]; then
             echo -e "${RED}❌ Error: RUNPOD_API_KEY environment variable not set${NC}"
             echo ""
             echo -e "${YELLOW}To use API deployment mode:${NC}"
@@ -86,7 +104,7 @@ check_api_requirements() {
 
         # jq is optional
         if ! command -v jq &> /dev/null; then
-            echo -e "${YELLOW}⚠️  jq not found — will show raw JSON${NC}"
+            echo -e "${YELLOW}⚠️  jq not found — will show raw JSON and use a basic parser fallback${NC}"
         else
             echo -e "${GREEN}✅ jq detected — pretty JSON parsing enabled${NC}"
         fi
@@ -96,17 +114,8 @@ check_api_requirements() {
     fi
 }
 
-# Get user input for configuration
-get_configuration() {
-    echo -e "${YELLOW}🔧 Configuration Setup${NC}"
-    echo ""
-
-    # Version input
-    echo -e "${BLUE}Version:${NC}"
-    read -p "Enter version tag (e.g., v1.0.0) [latest]: " version_input
-    VERSION_TAG=${version_input:-latest}
-
-    # Auto-generate image and template names based on version
+# Derive image and template name from the version tag
+set_names_from_version() {
     if [[ "$VERSION_TAG" == "latest" ]]; then
         DOCKER_IMAGE="heapsgo0d/sanctum:latest"
         TEMPLATE_NAME="Sanctum Latest"
@@ -114,6 +123,29 @@ get_configuration() {
         DOCKER_IMAGE="heapsgo0d/sanctum:$VERSION_TAG"
         TEMPLATE_NAME="Sanctum $VERSION_TAG"
     fi
+}
+
+# Get user input for configuration
+get_configuration() {
+    echo -e "${YELLOW}🔧 Configuration Setup${NC}"
+    echo ""
+
+    if [[ "$YES_MODE" == true ]]; then
+        VERSION_TAG="${VERSION_ARG:-latest}"
+        PRIVACY_MODE="enabled"
+        set_names_from_version
+        echo "  → Docker Image: $DOCKER_IMAGE"
+        echo "  → Container Disk: ${CONTAINER_DISK_GB}GB, Volume: ${VOLUME_GB}GB"
+        echo "  → Privacy Mode: $PRIVACY_MODE"
+        echo ""
+        return
+    fi
+
+    # Version input
+    echo -e "${BLUE}Version:${NC}"
+    read -p "Enter version tag (e.g., v1.1.0) [${VERSION_ARG:-latest}]: " version_input
+    VERSION_TAG=${version_input:-${VERSION_ARG:-latest}}
+    set_names_from_version
 
     echo "  → Docker Image: $DOCKER_IMAGE"
     echo "  → Template Name: $TEMPLATE_NAME"
@@ -140,7 +172,12 @@ get_configuration() {
     echo ""
 }
 
-# Generate template JSON
+# Readme body, shared by both API paths (JSON string, escaped newlines)
+make_readme() {
+    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Privacy-first: telemetry blocking via /etc/hosts\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b"
+}
+
+# Generate template JSON (manual upload option; schema differs from the API)
 generate_template() {
     cat > sanctum_template.json << EOF
 {
@@ -210,22 +247,81 @@ print_summary() {
     echo "  Privacy Mode: $PRIVACY_MODE"
     echo ""
     echo -e "${BLUE}Access:${NC}"
-    echo "  Open WebUI: http://[pod-id]-8080.proxy.runpod.net"
+    echo "  Open WebUI: https://[pod-id]-8080.proxy.runpod.net"
     echo "  SSH: RunPod provides host-level SSH (see RunPod console)"
     echo ""
 }
 
-# Deploy template via RunPod API
-deploy_template() {
-    echo -e "${YELLOW}🚀 Deploying template to RunPod...${NC}"
+# Pull "id" and "name" out of an API response
+parse_template_id() {
+    local response="$1" path="$2"
+    if $HAS_JQ; then
+        echo "$response" | jq -r "$path // empty"
+    else
+        echo "$response" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4
+    fi
+}
 
-    HAS_JQ=true
-    if ! command -v jq &>/dev/null; then
-        HAS_JQ=false
+# Deploy via the current REST API. Returns 0 on success.
+deploy_rest() {
+    echo -e "${BLUE}Trying REST API (${RUNPOD_REST_URL})...${NC}"
+
+    local payload
+    payload=$(cat << EOF
+{
+  "name": "$TEMPLATE_NAME",
+  "imageName": "$DOCKER_IMAGE",
+  "containerDiskInGb": $CONTAINER_DISK_GB,
+  "volumeInGb": $VOLUME_GB,
+  "volumeMountPath": "/workspace",
+  "ports": ["8080/http"],
+  "category": "NVIDIA",
+  "isPublic": false,
+  "isServerless": false,
+  "readme": "$(make_readme)",
+  "env": {
+    "OLLAMA_HOST": "0.0.0.0",
+    "OLLAMA_MODELS": "/workspace/models",
+    "DATA_DIR": "/workspace/data",
+    "WEBUI_AUTH": "False",
+    "WEBUI_PORT": "8080",
+    "PRIVACY_MODE": "$PRIVACY_MODE"
+  }
+}
+EOF
+)
+
+    local raw http_code body
+    raw=$(curl -s -w '\n%{http_code}' -X POST "$RUNPOD_REST_URL" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -d "$payload")
+    http_code=$(echo "$raw" | tail -n1)
+    body=$(echo "$raw" | sed '$d')
+
+    if [[ "$http_code" != "200" && "$http_code" != "201" ]]; then
+        echo -e "${YELLOW}⚠️  REST API returned HTTP $http_code${NC}"
+        echo -e "${YELLOW}   Response:${NC} $(echo "$body" | head -c 400)"
+        return 1
     fi
 
-    # Create API payload
-    local api_payload=$(cat << EOF
+    TEMPLATE_ID=$(parse_template_id "$body" '.id')
+    if [[ -z "$TEMPLATE_ID" || "$TEMPLATE_ID" == "null" ]]; then
+        echo -e "${YELLOW}⚠️  REST API returned HTTP $http_code but no template id${NC}"
+        echo -e "${YELLOW}   Response:${NC} $(echo "$body" | head -c 400)"
+        return 1
+    fi
+
+    DEPLOY_VIA="REST v1"
+    return 0
+}
+
+# Deploy via the legacy GraphQL mutation. Returns 0 on success.
+deploy_graphql() {
+    echo -e "${BLUE}Trying legacy GraphQL API (${RUNPOD_GRAPHQL_URL})...${NC}"
+
+    local api_payload
+    api_payload=$(cat << EOF
 {
   "name": "$TEMPLATE_NAME",
   "imageName": "$DOCKER_IMAGE",
@@ -234,7 +330,7 @@ deploy_template() {
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
   "ports": "8080/http",
-  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Privacy-first: telemetry blocking via /etc/hosts\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB\\n\\n## Access\\n- Open WebUI: http://[pod-id]-8080.proxy.runpod.net\\n- SSH: RunPod provides host-level SSH automatically",
+  "readme": "$(make_readme)",
   "env": [
     {"key": "OLLAMA_HOST", "value": "0.0.0.0"},
     {"key": "OLLAMA_MODELS", "value": "/workspace/models"},
@@ -247,10 +343,8 @@ deploy_template() {
 EOF
 )
 
-    echo -e "${BLUE}Sending request to RunPod API...${NC}"
-
-    local response=$(curl -s -X POST \
-        "https://api.runpod.io/graphql" \
+    local response
+    response=$(curl -s -X POST "$RUNPOD_GRAPHQL_URL" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $RUNPOD_API_KEY" \
         -d "$(cat << EOF
@@ -263,39 +357,50 @@ EOF
 EOF
 )")
 
-    # Error detection
+    # Non-JSON response (e.g. "Internal Server Error") - report it as-is
+    if ! echo "$response" | grep -q '^{'; then
+        echo -e "${RED}❌ GraphQL API returned non-JSON response:${NC} $(echo "$response" | head -c 400)"
+        return 1
+    fi
+
     if echo "$response" | grep -q '"errors"'; then
-        echo -e "${RED}❌ API Error:${NC}"
+        echo -e "${RED}❌ GraphQL API Error:${NC}"
         if $HAS_JQ; then
             echo "$response" | jq -r '.errors[0].message'
         else
-            echo "$response"
+            echo "$response" | head -c 400
         fi
         return 1
     fi
 
-    # Extract template info
-    local template_id
-    local template_name
-    if $HAS_JQ; then
-        template_id=$(echo "$response" | jq -r '.data.saveTemplate.id')
-        template_name=$(echo "$response" | jq -r '.data.saveTemplate.name')
-    else
-        template_id=$(echo "$response" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4)
-        template_name=$(echo "$response" | grep -o '"name":"[^"]*' | head -n1 | cut -d'"' -f4)
-    fi
-
-    if [[ -n "$template_id" && "$template_id" != "null" ]]; then
-        echo -e "${GREEN}✅ Template deployed successfully!${NC}"
-        echo -e "${BLUE}Template ID:${NC} $template_id"
-        echo -e "${BLUE}Template Name:${NC} $template_name"
-        echo -e "${BLUE}RunPod Console:${NC} https://runpod.io/console/user/templates"
-        return 0
-    else
-        echo -e "${RED}❌ Failed to deploy template${NC}"
-        echo -e "${YELLOW}Response:${NC} $response"
+    TEMPLATE_ID=$(parse_template_id "$response" '.data.saveTemplate.id')
+    if [[ -z "$TEMPLATE_ID" || "$TEMPLATE_ID" == "null" ]]; then
+        echo -e "${RED}❌ GraphQL response contained no template id${NC}"
+        echo -e "${YELLOW}Response:${NC} $(echo "$response" | head -c 400)"
         return 1
     fi
+
+    DEPLOY_VIA="GraphQL (legacy)"
+    return 0
+}
+
+# Deploy template to RunPod: REST first, GraphQL as fallback
+deploy_template() {
+    echo -e "${YELLOW}🚀 Deploying template to RunPod...${NC}"
+
+    HAS_JQ=true
+    command -v jq &>/dev/null || HAS_JQ=false
+
+    if deploy_rest || { echo -e "${YELLOW}↩️  Falling back to the legacy GraphQL API...${NC}"; deploy_graphql; }; then
+        echo -e "${GREEN}✅ Template created successfully via ${DEPLOY_VIA}!${NC}"
+        echo -e "${BLUE}Template ID:${NC} $TEMPLATE_ID"
+        echo -e "${BLUE}Template Name:${NC} $TEMPLATE_NAME"
+        echo -e "${BLUE}RunPod Console:${NC} https://runpod.io/console/user/templates"
+        return 0
+    fi
+
+    echo -e "${RED}❌ Both API paths failed${NC}"
+    return 1
 }
 
 # Main execution
@@ -305,8 +410,10 @@ main() {
 
     check_api_requirements
 
-    echo -e "${YELLOW}Press Enter to continue with template creation...${NC}"
-    read
+    if [[ "$YES_MODE" != true ]]; then
+        echo -e "${YELLOW}Press Enter to continue with template creation...${NC}"
+        read
+    fi
 
     get_configuration
 
@@ -315,20 +422,18 @@ main() {
     print_summary
 
     if [[ "$DEPLOY_MODE" == "api" ]]; then
-        echo -e "${YELLOW}🚀 Deploying to RunPod...${NC}"
         if deploy_template; then
-            echo ""
-            echo -e "${GREEN}✅ Deployment complete!${NC}"
             echo ""
             echo -e "${YELLOW}Next Steps:${NC}"
             echo "  1. Go to RunPod Console → Templates"
             echo "  2. Find '$TEMPLATE_NAME'"
             echo "  3. Deploy a pod with GPU"
-            echo "  4. Access Open WebUI at http://[pod-id]-8080.proxy.runpod.net"
+            echo "  4. Access Open WebUI at https://[pod-id]-8080.proxy.runpod.net"
         else
             echo ""
-            echo -e "${YELLOW}⚠️  API deployment failed, but local file created${NC}"
+            echo -e "${YELLOW}⚠️  API deployment failed, but the local file was created${NC}"
             echo -e "${BLUE}Upload sanctum_template.json manually${NC}"
+            exit 1
         fi
     else
         echo -e "${GREEN}✅ Template file created successfully!${NC}"
@@ -339,7 +444,7 @@ main() {
         echo -e "${YELLOW}Next Steps:${NC}"
         echo "  1. Upload sanctum_template.json to RunPod Templates"
         echo "  2. Deploy a pod using your template"
-        echo "  3. Access Open WebUI at http://[pod-id]-8080.proxy.runpod.net"
+        echo "  3. Access Open WebUI at https://[pod-id]-8080.proxy.runpod.net"
         echo ""
         echo -e "${BLUE}💡 Tip: Use './template.sh --deploy' for automatic deployment${NC}"
     fi
