@@ -125,8 +125,11 @@ start_ollama() {
 start_webui() {
     log "INFO" "🌐 Starting Open WebUI..."
 
-    # Start Open WebUI in background
-    open-webui serve --host 0.0.0.0 --port ${WEBUI_PORT:-8080} > /tmp/webui.log 2>&1 &
+    # Start Open WebUI in background, from DATA_DIR: `open-webui serve` writes
+    # .webui_secret_key to its cwd when WEBUI_SECRET_KEY is unset, and that key
+    # must live on the volume or every login session is invalidated on restart.
+    # exec keeps $! pointing at the server itself, not the subshell.
+    ( cd "${DATA_DIR:-/workspace/data}" && exec open-webui serve --host 0.0.0.0 --port "${WEBUI_PORT:-8080}" ) > /tmp/webui.log 2>&1 &
     WEBUI_PID=$!
 
     log "INFO" "  • WebUI PID: $WEBUI_PID"

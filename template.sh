@@ -216,8 +216,18 @@ generate_template() {
     },
     {
       "key": "WEBUI_AUTH",
-      "value": "False",
-      "description": "Open WebUI authentication (set to True to enable)"
+      "value": "True",
+      "description": "Open WebUI login (True). Do not disable on a proxied pod"
+    },
+    {
+      "key": "WEBUI_ADMIN_EMAIL",
+      "value": "",
+      "description": "Set before first boot to pre-create the admin (avoids the first-visitor-becomes-admin race)"
+    },
+    {
+      "key": "WEBUI_ADMIN_PASSWORD",
+      "value": "",
+      "description": "Password for WEBUI_ADMIN_EMAIL; only used when no users exist yet"
     },
     {
       "key": "WEBUI_PORT",
@@ -283,7 +293,9 @@ deploy_rest() {
     "OLLAMA_HOST": "0.0.0.0",
     "OLLAMA_MODELS": "/workspace/models",
     "DATA_DIR": "/workspace/data",
-    "WEBUI_AUTH": "False",
+    "WEBUI_AUTH": "True",
+    "WEBUI_ADMIN_EMAIL": "",
+    "WEBUI_ADMIN_PASSWORD": "",
     "WEBUI_PORT": "8080",
     "PRIVACY_MODE": "$PRIVACY_MODE"
   }
@@ -335,7 +347,9 @@ deploy_graphql() {
     {"key": "OLLAMA_HOST", "value": "0.0.0.0"},
     {"key": "OLLAMA_MODELS", "value": "/workspace/models"},
     {"key": "DATA_DIR", "value": "/workspace/data"},
-    {"key": "WEBUI_AUTH", "value": "False"},
+    {"key": "WEBUI_AUTH", "value": "True"},
+    {"key": "WEBUI_ADMIN_EMAIL", "value": ""},
+    {"key": "WEBUI_ADMIN_PASSWORD", "value": ""},
     {"key": "WEBUI_PORT", "value": "8080"},
     {"key": "PRIVACY_MODE", "value": "$PRIVACY_MODE"}
   ]

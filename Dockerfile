@@ -19,7 +19,9 @@ ENV OLLAMA_HOST=0.0.0.0 \
 
 # Open WebUI configuration
 ENV DATA_DIR=/workspace/data \
-    WEBUI_AUTH=False \
+    WEBUI_AUTH=True \
+    ENABLE_SIGNUP=false \
+    DEFAULT_USER_ROLE=pending \
     WEBUI_PORT=8080 \
     OLLAMA_BASE_URL=http://127.0.0.1:11434 \
     SCARF_NO_ANALYTICS=true \

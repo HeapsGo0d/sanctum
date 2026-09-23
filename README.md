@@ -83,7 +83,11 @@ grep "0.0.0.0" /etc/hosts
 | `OLLAMA_NUM_PARALLEL` | `2` | Number of parallel requests |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API URL for Open WebUI |
 | `DATA_DIR` | `/workspace/data` | Open WebUI data directory |
-| `WEBUI_AUTH` | `False` | Enable Open WebUI authentication |
+| `WEBUI_AUTH` | `True` | Open WebUI login. Leave on — a proxied RunPod pod is always public |
+| `ENABLE_SIGNUP` | `false` | No self-registration after the first admin exists |
+| `DEFAULT_USER_ROLE` | `pending` | Any account that does get created waits for admin approval |
+| `WEBUI_ADMIN_EMAIL` | *(unset)* | With `WEBUI_ADMIN_PASSWORD`, pre-creates the admin at first boot |
+| `WEBUI_ADMIN_PASSWORD` | *(unset)* | See above. Only used while the user table is empty |
 | `WEBUI_PORT` | `8080` | Open WebUI port |
 | `PRIVACY_MODE` | `enabled` | Enable telemetry blocking (`enabled`/`disabled`) |
 | `RAG_EMBEDDING_ENGINE` | *(unset)* | Set to `ollama` to run RAG embeddings on the GPU via Ollama instead of the bundled CPU model |
@@ -102,6 +106,48 @@ ollama pull nomic-embed-text          # or any embedding model
 # then set in the template environment:
 RAG_EMBEDDING_ENGINE=ollama
 ```
+
+## 🔐 Authentication
+
+Login is on (`WEBUI_AUTH=True`). On RunPod every proxied pod is reachable by anyone who has
+the URL, so there is no "private deployment" where auth-off is acceptable: with it off, the
+first visitor is the admin, and the admin panel can add exfiltration endpoints or run Python
+in the container.
+
+### Fresh volume
+
+Set `WEBUI_ADMIN_EMAIL` and `WEBUI_ADMIN_PASSWORD` in the template **before the first
+boot**. Open WebUI creates that admin at startup (only while no users exist) and the first
+signup race never happens.
+
+If you leave them unset, the **first person to sign up becomes admin**. Open WebUI does not
+gate that first signup on `ENABLE_SIGNUP`, so you cannot lock yourself out — but you must be
+the one who gets there first. Open the URL as soon as the startup log prints
+"Sanctum started successfully".
+
+After the admin exists, `ENABLE_SIGNUP=false` closes registration and any account created by
+other means sits at `DEFAULT_USER_ROLE=pending` until you approve it.
+
+### Existing volume created with auth off (pre-v1.2.0)
+
+Open WebUI's auth-off mode created a real admin account, **`admin@localhost` with password
+`admin`**. Turning auth on against that database means anyone can log in with those
+credentials until they are changed. Reset the password **before** you redeploy:
+
+```bash
+# On the pod (SSH), while it is still running the old image:
+HASH=$(htpasswd -bnBC 10 "" 'your-new-password' | tr -d ':\n')
+sqlite3 /workspace/data/webui.db \
+  "UPDATE auth SET password='$HASH' WHERE email='admin@localhost';"
+```
+
+(`htpasswd` is in `apache2-utils`; `sqlite3` in `sqlite3`. This is the procedure from
+Open WebUI's own password-reset docs.) Then redeploy with the new image and log in as
+`admin@localhost`. Change the email in Settings → Account if you like.
+
+The fallback — redeploy first, then log in as `admin`/`admin` and change it immediately —
+works, but leaves a window where the default credentials are live on a public URL.
+`WEBUI_ADMIN_EMAIL`/`PASSWORD` do nothing on this volume because users already exist.
 
 ## 🔒 Privacy Features
 
@@ -284,7 +330,7 @@ MIT License - see LICENSE file for details.
 - **Privacy Scope**: Blocks known telemetry/analytics domains via `/etc/hosts`
 - **Limitations**: Does not provide full network isolation (open internet access remains)
 - **Production Use**: Consider additional network policies (firewalls, VPNs) for stricter isolation
-- **Authentication**: Default `WEBUI_AUTH=False` - enable for public deployments
+- **Authentication**: `WEBUI_AUTH=True`, signup closed. See the Authentication section for first-boot and migration steps
 - **Graceful Degradation**: `/etc/hosts` blocking skipped on read-only filesystems
 - **Supervision**: if Ollama or Open WebUI exits, the container exits too rather than
   leaving a pod that looks healthy with a dead service
