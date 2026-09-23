@@ -6,7 +6,6 @@ services:
       args:
         SANCTUM_VERSION: dev
     container_name: sanctum
-    privileged: true  # Required for /etc/hosts modification
     ports:
       - "8080:8080"   # Open WebUI
     volumes:
