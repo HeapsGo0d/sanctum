@@ -187,8 +187,8 @@ generate_template() {
   "environmentVariables": [
     {
       "key": "OLLAMA_HOST",
-      "value": "0.0.0.0",
-      "description": "Ollama server bind address"
+      "value": "127.0.0.1",
+      "description": "Ollama bind address. Loopback only - the API has no auth"
     },
     {
       "key": "OLLAMA_MODELS",
@@ -275,7 +275,7 @@ deploy_rest() {
   "isServerless": false,
   "readme": "$(make_readme)",
   "env": {
-    "OLLAMA_HOST": "0.0.0.0",
+    "OLLAMA_HOST": "127.0.0.1",
     "OLLAMA_MODELS": "/workspace/models",
     "DATA_DIR": "/workspace/data",
     "WEBUI_AUTH": "True",
@@ -329,7 +329,7 @@ deploy_graphql() {
   "ports": "8080/http",
   "readme": "$(make_readme)",
   "env": [
-    {"key": "OLLAMA_HOST", "value": "0.0.0.0"},
+    {"key": "OLLAMA_HOST", "value": "127.0.0.1"},
     {"key": "OLLAMA_MODELS", "value": "/workspace/models"},
     {"key": "DATA_DIR", "value": "/workspace/data"},
     {"key": "WEBUI_AUTH", "value": "True"},

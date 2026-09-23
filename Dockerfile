@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CUDA_DEVICE_ORDER=PCI_BUS_ID
 
 # Ollama configuration
-ENV OLLAMA_HOST=0.0.0.0 \
+ENV OLLAMA_HOST=127.0.0.1 \
     OLLAMA_MODELS=/workspace/models \
     OLLAMA_NUM_PARALLEL=2 \
     OLLAMA_NO_CLOUD=1
@@ -96,7 +96,8 @@ RUN chmod +x /scripts/*.sh
 
 # Expose ports
 # 8080 - Open WebUI (HTTP)
-# 11434 - Ollama API (bound on 0.0.0.0 but deliberately not EXPOSEd or proxied)
+# 11434 - Ollama API, loopback only (OLLAMA_HOST=127.0.0.1): no auth, so nothing
+#         outside this network namespace may reach it
 EXPOSE 8080
 
 # Health check

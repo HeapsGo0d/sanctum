@@ -74,7 +74,7 @@ docker exec sanctum env | grep -E 'OLLAMA_NO_CLOUD|ANONYMIZED_TELEMETRY|WEBUI_AU
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OLLAMA_HOST` | `0.0.0.0` | Ollama server bind address |
+| `OLLAMA_HOST` | `127.0.0.1` | Ollama bind address. Loopback only — the API has no authentication |
 | `OLLAMA_MODELS` | `/workspace/models` | Ollama models directory |
 | `OLLAMA_NUM_PARALLEL` | `2` | Number of parallel requests |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API URL for Open WebUI |
@@ -272,9 +272,9 @@ ollama list
 # Run a model
 ollama run llama2
 
-# Check service status
-curl http://localhost:11434/api/tags
-curl http://localhost:8080
+# Check service status (Ollama listens on loopback only)
+curl http://127.0.0.1:11434/api/tags
+curl http://localhost:8080/health
 ```
 
 ## 🐛 Troubleshooting
