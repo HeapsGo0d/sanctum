@@ -124,6 +124,29 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **File**: `Dockerfile` (useradd block), `scripts/startup.sh` (`setup_storage`,
   `check_ollama_gpu`, `RUN_AS`)
 
+### Why Pin Open WebUI? (v1.2.0 — reverses the v1.1.0 "deliberately unpinned")
+- **Decision**: `ARG OPEN_WEBUI_VERSION=0.11.4`, `pip install "open-webui==${OPEN_WEBUI_VERSION}"`
+- **Reason**: an unpinned install means every rebuild silently inherits whatever upstream
+  turned on since last time. Open WebUI has repeatedly shipped default-on features that
+  contact third parties (GitHub version check, community sharing, OpenAI model polling,
+  Pyodide from a CDN). A pin plus a review step on each bump turns that into a conscious
+  choice. Cost: security fixes need a deliberate bump — acceptable for a single-user pod
+- **Review procedure**: diff the `os.getenv(` lines of `config.py` and `env.py` between the
+  pinned tag and the candidate (README "Bumping Open WebUI or Ollama"). New default-on
+  outbound features get an explicit `false` in the Dockerfile
+- **0.11.0 → 0.11.4 review (done 2026-09-23)**: new env defaults are all off or inert for
+  Sanctum — `ENABLE_DIRECT_INTEGRATIONS=False`, `ENABLE_KNOWLEDGE_FILE_RETENTION=False`,
+  `ENABLE_TOOL_PERMISSIONS=False`, `STAAN_*` (a search provider; empty), `TIKA_SERVER_VERSION`,
+  `AIOHTTP_CLIENT_ASYNC_DNS_RESOLVER=False` (DNS back to the system resolver),
+  `USE_SLIM_DOCKER`, `DEFAULT_INTERFACE_SETTINGS`, `TASK_MODEL_PARAMS`; `ENABLE_ADMIN_CHAT_ACCESS`
+  moved from config.py to env.py (still True). Nothing privacy-relevant flipped on
+- **Also pinned**: `jlumbroso/free-disk-space` in CI to commit `36e9a5a` (v2.0.0) instead of
+  `@main`; it runs before the image build, so a compromised `main` could tamper with the
+  image. v2.0.0 accepts every input the workflow passes (checked `action.yml`)
+- **Not bumped here**: Ollama v0.32.14 → v0.34.3 is available (`.tar.zst` asset present,
+  `OLLAMA_NO_CLOUD` and `OLLAMA_HOST` semantics unchanged). Out of scope for a privacy branch
+- **File**: `Dockerfile` (Open WebUI RUN block), `.github/workflows/build-and-push.yml`
+
 ### Why Is the Version a Build ARG?
 - **Decision**: `ARG SANCTUM_VERSION` → `ENV SANCTUM_VERSION`, stamped by CI from `github.ref_name`, printed by the startup banner
 - **Reason**: the banner was a hardcoded string and had already drifted (said v1.0.5 while the repo was tagged v1.0.6). One source of truth, no release-checklist step to forget

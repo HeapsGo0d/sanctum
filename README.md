@@ -8,7 +8,7 @@ Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI: lo
 
 - **🔒 Privacy-First**: Login required, all telemetry off, outbound features disabled by default
 - **⚡ Fast Startup**: Two services, no unnecessary operations
-- **🧩 Current Stack**: Ollama v0.32.14 + Open WebUI (latest on PyPI at build time)
+- **🧩 Pinned Stack**: Ollama v0.32.14 + Open WebUI 0.11.4, both explicit build ARGs
 - **🎯 Minimal**: Clean architecture, essential functionality only
 - **💾 Persistent Storage**: Models and data survive pod restarts
 - **🎮 GPU Support**: Automatic NVIDIA GPU detection and configuration
@@ -356,6 +356,22 @@ docker run -d \
   -v $(pwd)/test-workspace:/workspace \
   sanctum:dev
 ```
+
+### Bumping Open WebUI or Ollama
+
+Both versions are build ARGs (`OPEN_WEBUI_VERSION`, `OLLAMA_VERSION` in the Dockerfile).
+Open WebUI regularly adds features that are **on by default and contact a third party**
+(version check, community sharing, OpenAI polling all arrived that way). On every bump:
+
+```bash
+# What changed in the defaults between the pinned and the candidate version?
+diff <(curl -fsSL https://raw.githubusercontent.com/open-webui/open-webui/v0.11.4/backend/open_webui/config.py | grep -E 'os\.(getenv|environ\.get)\(' | sort -u) \
+     <(curl -fsSL https://raw.githubusercontent.com/open-webui/open-webui/vNEW/backend/open_webui/config.py   | grep -E 'os\.(getenv|environ\.get)\(' | sort -u)
+```
+
+Do the same for `env.py`. Anything new that defaults on and talks outward gets an explicit
+`false` in the Dockerfile and a row in "What prevents outbound contact". Then re-check the
+admin-panel list in that section still matches the UI.
 
 ### Push to Docker Hub
 

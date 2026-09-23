@@ -78,13 +78,16 @@ RUN curl -fsSL -o /tmp/ollama.tar.zst \
     && test -x /usr/bin/ollama
 
 # Install Open WebUI
+# Pinned: every bump is reviewed against upstream config.py/env.py for new
+# default-on features that contact third parties - see CONTEXT.md.
 # CPU-only torch goes in first so pip never pulls the CUDA build that
 # sentence-transformers would otherwise drag in (~4.5GB). Ollama owns GPU
 # inference and ships its own CUDA runtime - see CONTEXT.md.
+ARG OPEN_WEBUI_VERSION=0.11.4
 RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python3.11 -m pip install --no-cache-dir torch \
     --index-url https://download.pytorch.org/whl/cpu \
-    && python3.11 -m pip install --no-cache-dir open-webui \
+    && python3.11 -m pip install --no-cache-dir "open-webui==${OPEN_WEBUI_VERSION}" \
     && python3.11 -c "import torch; assert torch.__version__.endswith('+cpu'), 'CUDA torch leaked in: ' + torch.__version__"
 
 # Unprivileged service user. startup.sh stays root only long enough to fix
