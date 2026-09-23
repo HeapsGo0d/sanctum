@@ -12,7 +12,7 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 
 - **Only implement what actually works** - No aspirational features that don't deliver
 - **Be honest about limitations** - Clear documentation about what we do/don't provide
-- **Minimal complexity** - 8 core files, no supervisor loops, no unnecessary services
+- **Minimal complexity** - 7 core files, no supervisor loops, no unnecessary services
 - **Fast startup** - Health checks with timeouts, no auto-downloads
 - **Privacy-first** - Block telemetry where possible, be transparent about scope
 
@@ -28,12 +28,24 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Reason**: `open-webui` package requires Python 3.11+, Ubuntu 22.04 ships with 3.10
 - **File**: `Dockerfile:38-55`
 
-### Why /etc/hosts Only for Privacy?
-- **Decision**: Use `/etc/hosts` blocking for telemetry, NOT iptables network isolation
-- **Reason**: iptables cannot filter by domain names (only IPs), allowlist doesn't work
-- **Impact**: Removed `setup-network-isolation.sh`, removed `ALLOWED_DOMAINS` variable
-- **Honesty**: README clearly states "blocks telemetry domains" not "full network isolation"
-- **File**: `scripts/privacy/setup-blocklist.sh`
+### Why No /etc/hosts Blocklist? (v1.2.0 — reverses the v1.0.x decision)
+- **Decision**: Delete `scripts/privacy/setup-blocklist.sh`, its validation step, the
+  "N domains blocked" banner and the `PRIVACY_MODE` switch. Privacy is now entirely
+  environment variables
+- **Reason**: `/etc/hosts` is an exact-hostname match. Every real telemetry endpoint is a
+  subdomain — `us.i.posthog.com` (Chroma), `oNNN.ingest.sentry.io`, `api.segment.io`,
+  `www.google-analytics.com` — so `0.0.0.0 posthog.com` blocked none of them. The three
+  Ollama entries were the wrong domain: Ollama moved to `ollama.com` in 2024, and the Linux
+  `ollama serve` binary has no update check at all (the updater lives in `app/updater/`,
+  desktop only). Cloud inference and web search go to `ollama.com` and are stopped by
+  `OLLAMA_NO_CLOUD=1`, not by DNS
+- **Validation was circular**: it checked that the bare domains it had just written resolved
+  to 0.0.0.0, which said nothing about the endpoints actually contacted
+- **Alternatives considered**: enumerating real subdomains (fragile, still a guess), or a
+  local wildcard resolver such as dnsmasq (a second service, against the one-container
+  premise). Neither beats "be honest that env vars are the control"
+- **History**: the v1.0.x rationale was "iptables cannot filter by domain, so use
+  /etc/hosts". The first half was right; the second half did not work either
 
 ### Why No Container SSH?
 - **Decision**: Don't install SSH server, remove port 22 from container
@@ -53,11 +65,11 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Audit logs**: Disabled to prevent Open WebUI from writing audit data to `/workspace/data` (mounted persistent volume).
 - **File**: `Dockerfile:21-29`
 
-### Why Ollama Domains in Blocklist?
-- **Decision**: Add `ollama.ai`, `updates.ollama.ai`, `telemetry.ollama.ai` to the `/etc/hosts` blocklist
-- **Reason**: Belt-and-suspenders. `OLLAMA_NO_CLOUD=1` is the primary control; `/etc/hosts` is the network-level backstop — consistent with Sanctum's existing privacy philosophy.
-- **Acknowledged limitation**: Domains are best-effort. If Ollama changes endpoints, this list won't catch new ones. The env var is more reliable.
-- **File**: `scripts/privacy/setup-blocklist.sh:48-51`
+### Why Ollama Domains in Blocklist? (v1.0.5 — superseded in v1.2.0)
+- Added `ollama.ai`, `updates.ollama.ai`, `telemetry.ollama.ai` as a "backstop" to
+  `OLLAMA_NO_CLOUD=1`. Review in v1.2.0 found the domain was wrong (`ollama.com`) and two
+  of the three hostnames have no evidence of ever existing. Removed with the blocklist;
+  see "Why No /etc/hosts Blocklist?"
 
 ### Why Pinned Ollama Version?
 - **Decision**: Pin Ollama to specific version (v0.32.14), not dynamic "latest"
@@ -153,7 +165,7 @@ Ubuntu 22.04 base
 - Docker builds successfully (Build #6)
 - Ollama installs via manual tarball extraction
 - Open WebUI installs with Python 3.11
-- /etc/hosts telemetry blocking works
+- Telemetry off via environment variables (the /etc/hosts blocklist was removed in v1.2.0)
 - Health checks with proper timeouts
 - GitHub Actions auto-builds on push
 
@@ -179,9 +191,7 @@ sanctum/
 ├── .github/workflows/build-and-push.yml   # CI/CD pipeline
 └── scripts/
     ├── startup.sh                          # Main entrypoint
-    ├── health-check.sh                    # Service verification
-    └── privacy/
-        └── setup-blocklist.sh              # /etc/hosts blocking
+    └── health-check.sh                    # Service verification
 ```
 
 ## Lessons Learned
@@ -191,7 +201,8 @@ sanctum/
 2. **Python packaging is fragile** - Need exact dependency chain for wheels to build
 3. **RunPod provides SSH** - No need for container-level SSH server
 4. **setuptools compatibility** - Always upgrade pip/setuptools/wheel first
-5. **/etc/hosts is simple and works** - Better than complex networking that doesn't
+5. **/etc/hosts is simple but does not work for this** - exact-match only; telemetry
+   lives on subdomains. Settings are the control (learned v1.2.0, after shipping it for a year)
 
 ### Process
 1. **Be honest about limitations** - Users appreciate transparency

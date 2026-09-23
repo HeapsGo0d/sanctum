@@ -2,11 +2,11 @@
 
 **Minimal · Privacy-First · RunPod-Native**
 
-Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI with telemetry blocking. Built for simplicity and security.
+Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI: login on, telemetry off, no default-on features that talk to third parties. Built for simplicity and honesty about what it can and cannot protect.
 
 ## ✨ Features
 
-- **🔒 Privacy-First**: Telemetry blocking via /etc/hosts (22 analytics domains)
+- **🔒 Privacy-First**: Login required, all telemetry off, outbound features disabled by default
 - **⚡ Fast Startup**: Two services, no unnecessary operations
 - **🧩 Current Stack**: Ollama v0.32.14 + Open WebUI (latest on PyPI at build time)
 - **🎯 Minimal**: Clean architecture, essential functionality only
@@ -65,13 +65,9 @@ docker-compose up
 open http://localhost:8080
 ```
 
-Test privacy mode:
+Check the privacy settings took effect:
 ```bash
-# Shell into container
-docker exec -it sanctum bash
-
-# Check blocked domains
-grep "0.0.0.0" /etc/hosts
+docker exec sanctum env | grep -E 'OLLAMA_NO_CLOUD|ANONYMIZED_TELEMETRY|WEBUI_AUTH'
 ```
 
 ## 📋 Environment Variables
@@ -89,7 +85,6 @@ grep "0.0.0.0" /etc/hosts
 | `WEBUI_ADMIN_EMAIL` | *(unset)* | With `WEBUI_ADMIN_PASSWORD`, pre-creates the admin at first boot |
 | `WEBUI_ADMIN_PASSWORD` | *(unset)* | See above. Only used while the user table is empty |
 | `WEBUI_PORT` | `8080` | Open WebUI port |
-| `PRIVACY_MODE` | `enabled` | Enable telemetry blocking (`enabled`/`disabled`) |
 | `RAG_EMBEDDING_ENGINE` | *(unset)* | Set to `ollama` to run RAG embeddings on the GPU via Ollama instead of the bundled CPU model |
 
 ### A Note on GPU Usage
@@ -149,31 +144,26 @@ The fallback — redeploy first, then log in as `admin`/`admin` and change it im
 works, but leaves a window where the default credentials are live on a public URL.
 `WEBUI_ADMIN_EMAIL`/`PASSWORD` do nothing on this volume because users already exist.
 
-## 🔒 Privacy Features
+## 🔒 What prevents outbound contact
 
-### Telemetry Blocking
+There is no network filter in Sanctum. Earlier versions wrote an `/etc/hosts` blocklist; it
+was removed in v1.2.0 because `/etc/hosts` matches exact hostnames only, and every real
+telemetry endpoint is a subdomain (`posthog.com` does not block `us.i.posthog.com`;
+Ollama's cloud lives at `ollama.com`, not the `ollama.ai` entries the list carried). It
+blocked nothing while implying it did. The controls that work are settings:
 
-When `PRIVACY_MODE=enabled` (default):
+| Setting | Stops |
+|---|---|
+| `OLLAMA_NO_CLOUD=1` | Ollama cloud inference (`*-cloud` models), web search and web fetch — each would send prompts to `ollama.com` |
+| `ANONYMIZED_TELEMETRY=false` | Chroma's PostHog telemetry |
+| `SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true` | Open WebUI and dependency analytics |
+| `AUDIT_LOG_LEVEL=NONE`, `ENABLE_AUDIT_LOGS_FILE=false` | Request audit logs being written to the volume |
 
-Blocks common analytics and tracking domains:
-- Google Analytics, Tag Manager
-- Segment, Amplitude, Mixpanel
-- Sentry, PostHog, Hotjar
-- AI/ML tracking (OpenAI, Anthropic, HuggingFace)
+What still leaves the pod, by design:
 
-View blocked domains:
-```bash
-grep "0.0.0.0" /etc/hosts
-```
-
-### Disable Privacy Mode
-
-To disable privacy protections:
-```bash
-PRIVACY_MODE=disabled
-```
-
-Or edit in RunPod template environment variables.
+- **Model pulls** go to `registry.ollama.ai` and carry the model name and the pod's IP.
+- **The UI in your browser** is served by the pod, but RunPod's proxy and Cloudflare sit in
+  front of it — see Security Notes.
 
 ## 💾 Storage
 
@@ -256,13 +246,6 @@ Verify GPU is available:
 nvidia-smi
 ```
 
-### Check Privacy Status
-
-View blocked telemetry domains:
-```bash
-grep "0.0.0.0" /etc/hosts
-```
-
 ### Health Check Failures
 
 Manually check service health:
@@ -282,9 +265,7 @@ sanctum/
 ├── .github/workflows/build-and-push.yml   # Auto build/push
 └── scripts/
     ├── startup.sh                          # Main entrypoint
-    ├── health-check.sh                    # Service verification
-    └── privacy/
-        └── setup-blocklist.sh              # /etc/hosts blocking
+    └── health-check.sh                    # Service verification
 ```
 
 ## 🏗️ Development
@@ -299,10 +280,8 @@ docker build -t sanctum:dev .
 
 ```bash
 docker run -d \
-  --privileged \
   -p 8080:8080 \
   -v $(pwd)/test-workspace:/workspace \
-  -e PRIVACY_MODE=enabled \
   sanctum:dev
 ```
 
@@ -327,11 +306,10 @@ MIT License - see LICENSE file for details.
 
 ## 🔐 Security Notes
 
-- **Privacy Scope**: Blocks known telemetry/analytics domains via `/etc/hosts`
+- **Privacy Scope**: telemetry and outbound features are disabled by environment variables. There is no network-level filtering
 - **Limitations**: Does not provide full network isolation (open internet access remains)
 - **Production Use**: Consider additional network policies (firewalls, VPNs) for stricter isolation
 - **Authentication**: `WEBUI_AUTH=True`, signup closed. See the Authentication section for first-boot and migration steps
-- **Graceful Degradation**: `/etc/hosts` blocking skipped on read-only filesystems
 - **Supervision**: if Ollama or Open WebUI exits, the container exits too rather than
   leaving a pod that looks healthy with a dead service
 

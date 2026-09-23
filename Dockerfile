@@ -30,9 +30,6 @@ ENV DATA_DIR=/workspace/data \
     AUDIT_LOG_LEVEL=NONE \
     ENABLE_AUDIT_LOGS_FILE=false
 
-# Privacy configuration
-ENV PRIVACY_MODE=enabled
-
 # Sanctum version (stamped by CI from the git tag; "dev" for local builds)
 ARG SANCTUM_VERSION=dev
 ENV SANCTUM_VERSION=${SANCTUM_VERSION}
@@ -77,11 +74,11 @@ RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python3.11 -c "import torch; assert torch.__version__.endswith('+cpu'), 'CUDA torch leaked in: ' + torch.__version__"
 
 # Create workspace directories
-RUN mkdir -p /workspace/models /workspace/data /scripts/privacy
+RUN mkdir -p /workspace/models /workspace/data
 
 # Copy scripts
 COPY scripts/ /scripts/
-RUN chmod +x /scripts/*.sh /scripts/privacy/*.sh
+RUN chmod +x /scripts/*.sh
 
 # Expose ports
 # 8080 - Open WebUI (HTTP)

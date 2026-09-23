@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 # Configuration
 DOCKER_IMAGE="heapsgo0d/sanctum:latest"
 TEMPLATE_NAME="Sanctum Latest"
-TEMPLATE_DESCRIPTION="Minimal, privacy-first Ollama + Open WebUI for RunPod. Telemetry blocking, fast startup, clean architecture."
+TEMPLATE_DESCRIPTION="Minimal, privacy-first Ollama + Open WebUI for RunPod. Login on, telemetry off, no outbound features. Fast startup, clean architecture."
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-50}"
@@ -74,7 +74,7 @@ print_usage() {
 
     echo -e "${GREEN}Template includes:${NC}"
     echo "  ✅ Ollama + Open WebUI"
-    echo "  ✅ Privacy-first: telemetry blocking via /etc/hosts"
+    echo "  ✅ Privacy-first: login required, telemetry off, outbound features disabled"
     echo "  ✅ GPU support enabled"
     echo "  ✅ Persistent storage for models and data"
     echo ""
@@ -132,11 +132,9 @@ get_configuration() {
 
     if [[ "$YES_MODE" == true ]]; then
         VERSION_TAG="${VERSION_ARG:-latest}"
-        PRIVACY_MODE="enabled"
         set_names_from_version
         echo "  → Docker Image: $DOCKER_IMAGE"
         echo "  → Container Disk: ${CONTAINER_DISK_GB}GB, Volume: ${VOLUME_GB}GB"
-        echo "  → Privacy Mode: $PRIVACY_MODE"
         echo ""
         return
     fi
@@ -158,23 +156,11 @@ get_configuration() {
     read -p "Default volume size in GB [${VOLUME_GB}]: " tmp_vol
     VOLUME_GB=${tmp_vol:-$VOLUME_GB}
     echo ""
-
-    # Privacy mode
-    echo -e "${BLUE}Privacy Settings:${NC}"
-    read -p "Enable privacy mode by default? [yes]: " privacy_input
-    PRIVACY_MODE=${privacy_input:-yes}
-    if [[ "$PRIVACY_MODE" =~ ^[Yy] ]]; then
-        PRIVACY_MODE="enabled"
-    else
-        PRIVACY_MODE="disabled"
-    fi
-    echo "  → Privacy Mode: $PRIVACY_MODE"
-    echo ""
 }
 
 # Readme body, shared by both API paths (JSON string, escaped newlines)
 make_readme() {
-    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Privacy-first: telemetry blocking via /etc/hosts\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b"
+    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Login required (WEBUI_AUTH=True); set WEBUI_ADMIN_EMAIL/PASSWORD before first boot\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b"
 }
 
 # Generate template JSON (manual upload option; schema differs from the API)
@@ -233,11 +219,6 @@ generate_template() {
       "key": "WEBUI_PORT",
       "value": "8080",
       "description": "Open WebUI port"
-    },
-    {
-      "key": "PRIVACY_MODE",
-      "value": "$PRIVACY_MODE",
-      "description": "Enable telemetry blocking (enabled/disabled)"
     }
   ],
   "startScript": "/scripts/startup.sh"
@@ -254,7 +235,6 @@ print_summary() {
     echo "  Docker Image: $DOCKER_IMAGE"
     echo "  Container Disk: ${CONTAINER_DISK_GB}GB"
     echo "  Volume Size: ${VOLUME_GB}GB"
-    echo "  Privacy Mode: $PRIVACY_MODE"
     echo ""
     echo -e "${BLUE}Access:${NC}"
     echo "  Open WebUI: https://[pod-id]-8080.proxy.runpod.net"
@@ -296,8 +276,7 @@ deploy_rest() {
     "WEBUI_AUTH": "True",
     "WEBUI_ADMIN_EMAIL": "",
     "WEBUI_ADMIN_PASSWORD": "",
-    "WEBUI_PORT": "8080",
-    "PRIVACY_MODE": "$PRIVACY_MODE"
+    "WEBUI_PORT": "8080"
   }
 }
 EOF
@@ -350,8 +329,7 @@ deploy_graphql() {
     {"key": "WEBUI_AUTH", "value": "True"},
     {"key": "WEBUI_ADMIN_EMAIL", "value": ""},
     {"key": "WEBUI_ADMIN_PASSWORD", "value": ""},
-    {"key": "WEBUI_PORT", "value": "8080"},
-    {"key": "PRIVACY_MODE", "value": "$PRIVACY_MODE"}
+    {"key": "WEBUI_PORT", "value": "8080"}
   ]
 }
 EOF

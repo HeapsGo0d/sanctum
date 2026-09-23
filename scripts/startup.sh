@@ -45,7 +45,6 @@ print_banner() {
 
 print_config() {
     log "INFO" "📋 Configuration:"
-    log "INFO" "  • Privacy Mode: ${PRIVACY_MODE:-enabled}"
     log "INFO" "  • Ollama Cloud: disabled (OLLAMA_NO_CLOUD=1)"
     log "INFO" "  • Ollama Models: /workspace/models"
     log "INFO" "  • WebUI Data: /workspace/data"
@@ -75,26 +74,6 @@ setup_storage() {
     log "INFO" "  ✓ /workspace/models (Ollama models)"
     log "INFO" "  ✓ /workspace/data (Open WebUI data)"
     log "INFO" ""
-}
-
-setup_privacy() {
-    # Privacy approach: /etc/hosts blocklist only (simple and effective)
-    # - No iptables filtering (can't filter by domain names, only IPs)
-    # - No additional Python monitoring packages (psutil, httpx) needed
-    # - This keeps the image minimal and the privacy promise honest
-    if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
-        log "INFO" "🔒 Setting up privacy protections..."
-
-        # Setup telemetry blocklist
-        if [[ -x /scripts/privacy/setup-blocklist.sh ]]; then
-            /scripts/privacy/setup-blocklist.sh
-        fi
-
-        log "INFO" ""
-    else
-        log "INFO" "⚠️  Privacy mode disabled"
-        log "INFO" ""
-    fi
 }
 
 start_ollama() {
@@ -159,14 +138,10 @@ print_success() {
     log "INFO" "  • Open WebUI: http://0.0.0.0:${WEBUI_PORT:-8080}"
     log "INFO" "  • Ollama API: http://0.0.0.0:11434"
     log "INFO" ""
-    log "INFO" "🔒 Privacy Status:"
-    if [[ "${PRIVACY_MODE:-enabled}" == "enabled" ]]; then
-        log "INFO" "  ✓ Telemetry blocking enabled"
-        log "INFO" "  ✓ Analytics domains blocked via /etc/hosts"
-        log "INFO" "  ✓ Ollama cloud features disabled (OLLAMA_NO_CLOUD=1)"
-    else
-        log "INFO" "  ⚠ Privacy protections disabled"
-    fi
+    log "INFO" "🔒 Privacy:"
+    log "INFO" "  ✓ Ollama cloud features disabled (OLLAMA_NO_CLOUD=1)"
+    log "INFO" "  ✓ Open WebUI telemetry disabled"
+    log "INFO" "  • Model pulls still contact registry.ollama.ai (see README)"
     log "INFO" ""
     log "INFO" "💡 Next Steps:"
     log "INFO" "  1. Open the WebUI URL above"
@@ -192,7 +167,6 @@ main() {
     print_config
     check_gpu
     setup_storage
-    setup_privacy
     start_ollama
     start_webui
     print_success
