@@ -1,7 +1,7 @@
 # Sanctum - Project Context
 
-**Last Updated**: 2026-08-19
-**Current Version**: v1.1.0
+**Last Updated**: 2026-09-23
+**Current Version**: v1.2.0 (branch `privacy-hardening`, not yet tagged)
 **Status**: Active Development
 
 ## Project Philosophy
@@ -217,12 +217,13 @@ Ubuntu 22.04 base
 - GitHub Actions auto-builds on push
 
 ### What's Deployed 🚀
-- Docker Hub: `heapsgo0d/sanctum:latest` (v1.1.0)
+- Docker Hub: `heapsgo0d/sanctum:latest` (v1.1.0 — v1.2.0 is on the `privacy-hardening` branch, untagged)
 - GitHub: `https://github.com/HeapsGo0d/sanctum`
 - Repository: Public, MIT licensed
 
 ### Known Issues 🐛
-- None outstanding. All v1.0.x issues resolved; see the v1.1.0 section below
+- v1.2.0 non-root: RunPod network-volume `chown` behaviour and `/dev/nvidia*` permissions for
+  uid 1000 are unverified from a build host. Startup logs a red block / WARN if either fails
 
 ## File Structure
 
@@ -257,6 +258,65 @@ sanctum/
 3. **Test the build** - Each fix taught us something about dependencies
 4. **Document decisions** - This file exists because context matters
 
+## Completed (v1.2.0) ✅
+
+### Session 2026-09-23 - Privacy Hardening (branch `privacy-hardening`)
+
+Full privacy review of v1.1.0, then eight commits, one per finding. Every env var name,
+default and behaviour was checked against Open WebUI `main` (== v0.11.4) `config.py`,
+`env.py`, `routers/auths.py`, `models/config.py` and Ollama v0.32.14 / v0.34.3 source.
+
+- [x] `WEBUI_AUTH=True`, `ENABLE_SIGNUP=false`, `DEFAULT_USER_ROLE=pending`;
+      `WEBUI_ADMIN_EMAIL/PASSWORD` template vars for race-free first boot; migration path for
+      auth-off DBs (`admin@localhost` / `admin` must be reset first); Open WebUI now runs from
+      `DATA_DIR` so `.webui_secret_key` survives restarts
+- [x] `/etc/hosts` blocklist, validation, banner and `PRIVACY_MODE` removed (exact-match only;
+      blocked nothing real)
+- [x] Outbound features off: `ENABLE_COMMUNITY_SHARING`, `ENABLE_OPENAI_API`,
+      `ENABLE_DIRECT_CONNECTIONS`, `ENABLE_WEB_SEARCH`, `ENABLE_CODE_EXECUTION`,
+      `ENABLE_CODE_INTERPRETER` = false; `OFFLINE_MODE=true`; `RAG_EMBEDDING_ENGINE=ollama` +
+      `nomic-embed-text` pulled at first boot; `RESET_CONFIG_ON_START` one-shot documented and
+      warned about in the log
+- [x] `OLLAMA_HOST=127.0.0.1`
+- [x] Services run as `sanctum` (uid 1000) via `setpriv`; visible root fallback
+- [x] `privileged: true` dropped from compose
+- [x] `free-disk-space` pinned to SHA; `open-webui==0.11.4`; 0.11.0→0.11.4 default review
+- [x] README: "What Sanctum cannot protect against", outbound-contact table, admin-toggle list,
+      stale "Search Ollama.com" corrected
+
+**Decision not taken — `ENABLE_PERSISTENT_CONFIG=false`**: considered and rejected. Once login
+is on, only the admin (or someone holding the admin session) can change settings, and such an
+attacker exfiltrates in-session and persists through Functions/Tools, which live in their own
+tables. Turning persistence off would not stop that and would discard every admin-panel
+setting on each restart. Kept on; drift is handled by the README's admin-toggle list and the
+one-shot reset. A startup check comparing DB values to the env was considered and skipped as
+over-engineering for a single-user pod.
+
+### Investigated — chat retention (item 8, not implemented)
+- Open WebUI offers **temporary chats** only: `USER_PERMISSIONS_CHAT_TEMPORARY=True` (users may
+  toggle; nothing written to the DB) and `USER_PERMISSIONS_CHAT_TEMPORARY_ENFORCED=False`
+  (`config.py:1897-1900`; `true` makes every chat temporary — zero at rest, no history at all)
+- **No server-side retention or auto-delete exists** for chats in `config.py` or
+  `models/chats.py` (archive/unarchive only). `ENABLE_KNOWLEDGE_FILE_RETENTION` concerns
+  knowledge files, not chats
+- Options if wanted later: (a) `USER_PERMISSIONS_CHAT_TEMPORARY_ENFORCED=true` — nothing on
+  disk, lose history; (b) an external `sqlite3 "DELETE FROM chat WHERE updated_at < …"` on a
+  timer — custom, outside Open WebUI. Both deferred
+
+### Investigated — access without the HTTP proxy (item 9, not implemented)
+- **Basic SSH** (`ssh.runpod.io`, all pods): key injection, **no SCP/SFTP** per RunPod docs;
+  community reports of `ssh -L` failing with "unsupported channel type" — the proxy does not
+  forward ports
+- **Full SSH**: needs a public-IP-capable machine, `sshd` inside the image, TCP port 22 in
+  the template; RunPod exposes `RUNPOD_PUBLIC_IP` and `RUNPOD_TCP_PORT_22`. Over that path
+  `ssh -L 8080:localhost:8080` is ordinary OpenSSH and would give end-to-end encryption to
+  the pod (RunPod still owns the host — see README)
+- **Proposal for a later branch**: `template.sh --tunnel-only` — ports `22/tcp` only, no
+  `8080/http`; image adds `openssh-server`; startup seeds `authorized_keys` from RunPod's
+  injected `PUBLIC_KEY` and runs `sshd` (as root, or with a dedicated port as `sanctum`). This
+  consciously reverses the v1.0.1 "no container SSH" decision, so it stays a proposal until
+  someone wants it
+
 ## Completed (v1.1.0) ✅
 
 ### Session 2026-08-19 - Review, Dependency Update, Release
@@ -265,7 +325,7 @@ Full code review after six idle months, then the updates it turned up.
 
 **Updates**
 - [x] Ollama v0.12.10 → v0.32.14, including the `.tgz` → `.tar.zst` asset-format change
-- [x] Open WebUI rebuilt against latest PyPI (0.11.0 — full UI redesign). Deliberately left unpinned
+- [x] Open WebUI rebuilt against latest PyPI (0.11.0 — full UI redesign). Deliberately left unpinned (reversed in v1.2.0)
 - [x] CPU-only PyTorch — drops the unused CUDA wheels from the image
 
 **Fixes found by review**

@@ -5,7 +5,7 @@
 #
 #   ./template.sh                      # generate sanctum_template.json only
 #   ./template.sh --deploy             # prompt, then create the template
-#   ./template.sh -y v1.1.0 --deploy   # non-interactive, uses defaults
+#   ./template.sh -y v1.2.0 --deploy   # non-interactive, uses defaults
 
 set -e
 
@@ -48,7 +48,7 @@ print_banner() {
     echo -e "${CYAN}"
     echo "╔═══════════════════════════════════════════╗"
     echo "║          🔒 SANCTUM TEMPLATE             ║"
-    echo "║       RunPod Template Creator v1.1        ║"
+    echo "║       RunPod Template Creator v1.2        ║"
     echo "╚═══════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -68,7 +68,7 @@ print_usage() {
         echo -e "${BLUE}📁 Local File Mode${NC} - Will generate files for manual upload"
         echo -e "${YELLOW}💡 Tips:${NC}"
         echo "  • './template.sh --deploy' for automatic RunPod deployment"
-        echo "  • './template.sh -y v1.1.0 --deploy' to skip all prompts"
+        echo "  • './template.sh -y v1.2.0 --deploy' to skip all prompts"
         echo ""
     fi
 
@@ -141,7 +141,7 @@ get_configuration() {
 
     # Version input
     echo -e "${BLUE}Version:${NC}"
-    read -p "Enter version tag (e.g., v1.1.0) [${VERSION_ARG:-latest}]: " version_input
+    read -p "Enter version tag (e.g., v1.2.0) [${VERSION_ARG:-latest}]: " version_input
     VERSION_TAG=${version_input:-${VERSION_ARG:-latest}}
     set_names_from_version
 
@@ -160,7 +160,7 @@ get_configuration() {
 
 # Readme body, shared by both API paths (JSON string, escaped newlines)
 make_readme() {
-    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Login required (WEBUI_AUTH=True); set WEBUI_ADMIN_EMAIL/PASSWORD before first boot\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b"
+    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Login required (WEBUI_AUTH=True); set WEBUI_ADMIN_EMAIL/PASSWORD before first boot\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net (TLS ends at RunPod's proxy)\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## What this cannot protect against\\nRunPod and its data-centre partner have root on the host: pod memory, disk, the /workspace volume and proxied traffic are all readable by them. No setting here changes that.\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b\\nEach pull sends the model name to registry.ollama.ai."
 }
 
 # Generate template JSON (manual upload option; schema differs from the API)

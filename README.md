@@ -4,6 +4,25 @@
 
 Sanctum is a privacy-focused RunPod template for running Ollama + Open WebUI: login on, telemetry off, no default-on features that talk to third parties. Built for simplicity and honesty about what it can and cannot protect.
 
+## ⚠️ What Sanctum cannot protect against
+
+Read this before trusting the pod with anything sensitive.
+
+**RunPod, and on Community Cloud the third-party data-centre partner running the machine,
+have root on the host.** That means they can read pod memory (including every prompt and
+response while a model is generating), GPU memory, the container filesystem, and the
+`/workspace` volume — where Open WebUI stores every conversation **unencrypted** in
+`data/webui.db`, plus `data/uploads/` and `data/vector_db/`. The volume outlives the pod.
+
+**The proxy URL is not end-to-end encrypted.** `https://<pod>-8080.proxy.runpod.net`
+terminates TLS at RunPod; the route is your browser → Cloudflare → RunPod load balancer →
+pod, and your conversations cross that path as plaintext HTTP on the last hop.
+
+No setting in this image changes either fact. What Sanctum does is narrower and stated
+exactly in "What prevents outbound contact": nothing in the container sends your data to
+anyone **other than** RunPod, and nobody without your login can reach it. If your threat
+model includes the hosting provider, run it on hardware you control.
+
 ## ✨ Features
 
 - **🔒 Privacy-First**: Login required, all telemetry off, outbound features disabled by default
@@ -31,7 +50,7 @@ export RUNPOD_API_KEY="your_runpod_api_key"
 ./template.sh --deploy
 
 # Non-interactive, pinned to a released tag:
-./template.sh -y v1.1.0 --deploy
+./template.sh -y v1.2.0 --deploy
 ```
 
 The script targets RunPod's REST API (`POST https://rest.runpod.io/v1/templates`) and
@@ -258,8 +277,13 @@ When you first open Open WebUI you'll see "No models available" — this is expe
 
 **Via the UI:**
 1. Click the model selector dropdown at the top
-2. Type a model name and click **Search Ollama.com** — or —
+2. Type a model name and click **Pull "<name>" from Ollama.com** — or —
 3. Go to **Admin Panel** → **Settings** → **Models**, enter a model name in the pull field, and click the download button
+
+Either way this is an `ollama pull`: the model name you typed and the pod's IP go to
+`registry.ollama.ai`. That is the only outbound call Sanctum makes on your behalf, and it
+carries no conversation content. (Older Open WebUI versions had a "Search Ollama.com"
+button that sent search text; the current UI does not.)
 
 **Via the terminal** (faster for large models):
 ```bash
@@ -395,8 +419,11 @@ MIT License - see LICENSE file for details.
 ## 🔐 Security Notes
 
 - **Privacy Scope**: telemetry and outbound features are disabled by environment variables. There is no network-level filtering
-- **Limitations**: Does not provide full network isolation (open internet access remains)
-- **Production Use**: Consider additional network policies (firewalls, VPNs) for stricter isolation
+- **Limitations**: no network isolation — the pod has open internet access, and the
+  hosting provider has full access to it (see "What Sanctum cannot protect against")
+- **Access path**: the RunPod HTTP proxy terminates TLS. An SSH tunnel over RunPod's
+  *public-IP* SSH would be end-to-end, but needs `sshd` in the image and a TCP port; see
+  CONTEXT.md "Investigated — access without the HTTP proxy" for the current status
 - **Authentication**: `WEBUI_AUTH=True`, signup closed. See the Authentication section for first-boot and migration steps
 - **Service user**: both services run as `sanctum` (uid 1000) via `setpriv`; root is used only to fix volume ownership at boot
 - **Supervision**: if Ollama or Open WebUI exits, the container exits too rather than
