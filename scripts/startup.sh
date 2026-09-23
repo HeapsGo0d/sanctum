@@ -11,6 +11,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Unprivileged service user (created in the Dockerfile). RUN_AS is filled by
+# setup_storage once /workspace ownership is confirmed; empty means root.
+SANCTUM_USER=sanctum
+SANCTUM_UID=1000
+RUN_AS=()
+
 # Logging function
 log() {
     local level=$1
@@ -50,6 +56,7 @@ print_config() {
     log "INFO" "  • WebUI Data: /workspace/data"
     log "INFO" "  • WebUI Port: ${WEBUI_PORT:-8080}"
     log "INFO" "  • RAG Embeddings: ${RAG_EMBEDDING_ENGINE:-ollama} / ${RAG_EMBEDDING_MODEL:-nomic-embed-text}"
+    log "INFO" "  • Service User: ${SANCTUM_USER} (uid ${SANCTUM_UID})"
     log "INFO" ""
 }
 
@@ -85,19 +92,42 @@ check_gpu() {
 setup_storage() {
     log "INFO" "💾 Setting up storage directories..."
 
-    mkdir -p /workspace/models
-    mkdir -p /workspace/data
+    mkdir -p /workspace/models /workspace/data
 
-    log "INFO" "  ✓ /workspace/models (Ollama models)"
-    log "INFO" "  ✓ /workspace/data (Open WebUI data)"
+    # RunPod mounts /workspace root-owned. PID 1 (root) fixes ownership so the
+    # services can run unprivileged. The recursive chown only runs when the
+    # top-level owner is wrong - once per volume, not on every boot.
+    local dir owner fixed=true
+    for dir in /workspace/models /workspace/data; do
+        owner=$(stat -c %u "$dir")
+        if [[ "$owner" != "$SANCTUM_UID" ]]; then
+            log "INFO" "  • $dir is owned by uid $owner - chowning to $SANCTUM_USER"
+            log "INFO" "    (first boot on this volume; slow if it already holds large models)"
+            chown -R "$SANCTUM_UID:$SANCTUM_UID" "$dir" || fixed=false
+        fi
+    done
+
+    if [[ "$fixed" == true ]]; then
+        RUN_AS=(setpriv --reuid="$SANCTUM_UID" --regid="$SANCTUM_UID" --init-groups --no-new-privs)
+        log "INFO" "  ✓ /workspace/models, /workspace/data owned by $SANCTUM_USER"
+        log "INFO" "  ✓ Services will run as $SANCTUM_USER"
+    else
+        # Honest fallback: a volume that refuses chown would otherwise take the
+        # pod down. Say so loudly rather than fail silently either way.
+        RUN_AS=()
+        log "ERROR" "  ✗ Could not change ownership of /workspace on this volume"
+        log "ERROR" "  ✗ FALLING BACK TO ROOT for both services so the pod stays usable"
+        log "ERROR" "    Privilege separation is OFF for this boot - see README 'Service user'"
+    fi
     log "INFO" ""
 }
 
 start_ollama() {
     log "INFO" "🚀 Starting Ollama..."
 
-    # Start Ollama in background
-    ollama serve > /tmp/ollama.log 2>&1 &
+    # Start Ollama in background as the service user (RUN_AS is empty only in
+    # the root fallback; an empty array expands to nothing)
+    "${RUN_AS[@]}" ollama serve > /tmp/ollama.log 2>&1 &
     OLLAMA_PID=$!
 
     log "INFO" "  • Ollama PID: $OLLAMA_PID"
@@ -107,6 +137,7 @@ start_ollama() {
     for i in {1..30}; do
         if curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
             log "INFO" "  ✓ Ollama ready on port 11434"
+            check_ollama_gpu
             return 0
         fi
         sleep 1
@@ -116,6 +147,22 @@ start_ollama() {
     log "ERROR" "Last 20 lines of Ollama log:"
     tail -20 /tmp/ollama.log
     exit 1
+}
+
+check_ollama_gpu() {
+    # Unprivileged Ollama needs read/write on /dev/nvidia*. If it silently
+    # fell back to CPU, say so - the symptom is otherwise just "slow".
+    command -v nvidia-smi &> /dev/null || return 0
+    local i
+    for i in {1..10}; do
+        if grep -qiE 'inference compute.*library=(cuda|rocm)' /tmp/ollama.log 2>/dev/null; then
+            log "INFO" "  ✓ Ollama reports a GPU compute device"
+            return 0
+        fi
+        sleep 1
+    done
+    log "WARN" "  ⚠ nvidia-smi sees a GPU but Ollama has not reported a CUDA device"
+    log "WARN" "    Check: ls -l /dev/nvidia*  (must be readable by uid ${SANCTUM_UID}); grep 'inference compute' /tmp/ollama.log"
 }
 
 ensure_embedding_model() {
@@ -148,7 +195,7 @@ start_webui() {
     # .webui_secret_key to its cwd when WEBUI_SECRET_KEY is unset, and that key
     # must live on the volume or every login session is invalidated on restart.
     # exec keeps $! pointing at the server itself, not the subshell.
-    ( cd "${DATA_DIR:-/workspace/data}" && exec open-webui serve --host 0.0.0.0 --port "${WEBUI_PORT:-8080}" ) > /tmp/webui.log 2>&1 &
+    ( cd "${DATA_DIR:-/workspace/data}" && exec "${RUN_AS[@]}" open-webui serve --host 0.0.0.0 --port "${WEBUI_PORT:-8080}" ) > /tmp/webui.log 2>&1 &
     WEBUI_PID=$!
 
     log "INFO" "  • WebUI PID: $WEBUI_PID"

@@ -87,8 +87,18 @@ RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python3.11 -m pip install --no-cache-dir open-webui \
     && python3.11 -c "import torch; assert torch.__version__.endswith('+cpu'), 'CUDA torch leaked in: ' + torch.__version__"
 
-# Create workspace directories
-RUN mkdir -p /workspace/models /workspace/data
+# Unprivileged service user. startup.sh stays root only long enough to fix
+# /workspace ownership, then drops to this user with setpriv (util-linux).
+# No USER directive: PID 1 must be root for the chown. HOME must be writable
+# for Ollama's ~/.ollama keys.
+RUN useradd --system --uid 1000 --user-group --create-home \
+        --home-dir /home/sanctum --shell /usr/sbin/nologin sanctum
+ENV HOME=/home/sanctum
+
+# Create workspace directories (a mounted volume replaces these; startup.sh
+# re-checks ownership at boot)
+RUN mkdir -p /workspace/models /workspace/data \
+    && chown -R sanctum:sanctum /workspace
 
 # Copy scripts
 COPY scripts/ /scripts/

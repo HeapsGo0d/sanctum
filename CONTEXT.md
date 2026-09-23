@@ -100,6 +100,30 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Not a supervisor**: there is deliberately no restart loop. Sanctum's premise is one container, no supervision framework — a crash should surface, not be papered over
 - **File**: `scripts/startup.sh:176-210`
 
+### Why Run as Non-Root, and Why Is There a Root Fallback?
+- **Decision**: a `sanctum` user (uid 1000) owns `/workspace`; `startup.sh` stays root only
+  to `chown` the volume, then launches both services via
+  `setpriv --reuid --regid --init-groups --no-new-privs`. No `USER` directive — PID 1 must be
+  root for the chown. `HOME=/home/sanctum` so Ollama can write its `~/.ollama` keys
+- **Reason**: with login on, the remaining path to arbitrary code is the admin's own
+  Functions/Tools/Pipelines (Python inside Open WebUI). As root that was full control of the
+  container and the injected `RUNPOD_API_KEY`; as `sanctum` it is a low-privilege process
+- **Why chown only on mismatch**: RunPod mounts `/workspace` root-owned (RunPod docs are
+  silent on volume ownership; the h2o-llmstudio #280 report shows the practical behaviour).
+  A recursive chown of a large model directory is slow, so it runs once per volume, when the
+  top-level owner is wrong
+- **Why fall back to root**: if the volume refuses `chown` (unknown network-volume
+  semantics), taking the pod down for a storage quirk is worse than running as root
+  visibly. The fallback prints a red `FALLING BACK TO ROOT` block; it never happens silently
+- **GPU**: `/dev/nvidia*` permissions as uid 1000 are unverified from a build host.
+  `check_ollama_gpu()` greps Ollama's `inference compute` line and warns if no CUDA device
+  appeared while `nvidia-smi` sees one
+- **Also fixed here**: `open-webui serve` writes `.webui_secret_key` to its cwd; running from
+  `/` as non-root would crash, and even as root the key was lost on every restart. It now
+  runs from `DATA_DIR`
+- **File**: `Dockerfile` (useradd block), `scripts/startup.sh` (`setup_storage`,
+  `check_ollama_gpu`, `RUN_AS`)
+
 ### Why Is the Version a Build ARG?
 - **Decision**: `ARG SANCTUM_VERSION` → `ENV SANCTUM_VERSION`, stamped by CI from `github.ref_name`, printed by the startup banner
 - **Reason**: the banner was a hardcoded string and had already drifted (said v1.0.5 while the repo was tagged v1.0.6). One source of truth, no release-checklist step to forget

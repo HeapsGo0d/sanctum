@@ -229,6 +229,27 @@ Set volume size in template or RunPod UI:
 - **0GB**: Ephemeral (models redownload on restart)
 - **20GB+**: Persistent (recommended for production)
 
+## 👤 Service user
+
+Ollama and Open WebUI run as `sanctum` (uid 1000), not root. The entrypoint starts as root
+only to make `/workspace/models` and `/workspace/data` owned by that user, then launches
+both services through `setpriv` with `--no-new-privs`. A Function or Tool that runs Python
+inside Open WebUI therefore runs as `sanctum`, and cannot read root-only files or change the
+image.
+
+Two things to know:
+
+- **First boot on an existing volume is slower.** The ownership fix is a recursive `chown`
+  and runs only when the top-level owner is wrong — once per volume. On a volume already
+  holding tens of GB of models, expect a minute or two.
+- **If the volume refuses `chown`**, the startup log prints a red `FALLING BACK TO ROOT`
+  block and runs both services as root so the pod stays usable. That is a deliberate,
+  visible fallback, not a silent one — if you see it, privilege separation is off. RunPod
+  documents nothing about volume ownership semantics; report what you see.
+
+If `nvidia-smi` sees a GPU but Ollama does not report a CUDA device, the log warns; check
+that `/dev/nvidia*` is readable by uid 1000.
+
 ## 🔧 Usage
 
 ### Download Models
@@ -361,6 +382,7 @@ MIT License - see LICENSE file for details.
 - **Limitations**: Does not provide full network isolation (open internet access remains)
 - **Production Use**: Consider additional network policies (firewalls, VPNs) for stricter isolation
 - **Authentication**: `WEBUI_AUTH=True`, signup closed. See the Authentication section for first-boot and migration steps
+- **Service user**: both services run as `sanctum` (uid 1000) via `setpriv`; root is used only to fix volume ownership at boot
 - **Supervision**: if Ollama or Open WebUI exits, the container exits too rather than
   leaving a pod that looks healthy with a dead service
 
