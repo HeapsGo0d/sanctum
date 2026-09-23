@@ -219,6 +219,11 @@ generate_template() {
       "key": "WEBUI_PORT",
       "value": "8080",
       "description": "Open WebUI port"
+    },
+    {
+      "key": "RESET_CONFIG_ON_START",
+      "value": "false",
+      "description": "Set true for ONE boot to re-seed Open WebUI settings from these variables, then set back to false"
     }
   ],
   "startScript": "/scripts/startup.sh"
@@ -276,7 +281,8 @@ deploy_rest() {
     "WEBUI_AUTH": "True",
     "WEBUI_ADMIN_EMAIL": "",
     "WEBUI_ADMIN_PASSWORD": "",
-    "WEBUI_PORT": "8080"
+    "WEBUI_PORT": "8080",
+    "RESET_CONFIG_ON_START": "false"
   }
 }
 EOF
@@ -329,7 +335,8 @@ deploy_graphql() {
     {"key": "WEBUI_AUTH", "value": "True"},
     {"key": "WEBUI_ADMIN_EMAIL", "value": ""},
     {"key": "WEBUI_ADMIN_PASSWORD", "value": ""},
-    {"key": "WEBUI_PORT", "value": "8080"}
+    {"key": "WEBUI_PORT", "value": "8080"},
+    {"key": "RESET_CONFIG_ON_START", "value": "false"}
   ]
 }
 EOF

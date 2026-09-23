@@ -49,7 +49,24 @@ print_config() {
     log "INFO" "  • Ollama Models: /workspace/models"
     log "INFO" "  • WebUI Data: /workspace/data"
     log "INFO" "  • WebUI Port: ${WEBUI_PORT:-8080}"
+    log "INFO" "  • RAG Embeddings: ${RAG_EMBEDDING_ENGINE:-ollama} / ${RAG_EMBEDDING_MODEL:-nomic-embed-text}"
     log "INFO" ""
+}
+
+warn_if_config_reset() {
+    # One-shot re-seed of Open WebUI's persisted settings from the environment.
+    # Loud on purpose: left on, it silently wipes admin-panel changes every boot.
+    if [[ "${RESET_CONFIG_ON_START:-false}" == "true" ]]; then
+        log "WARN" ""
+        log "WARN" "══════════════════════════════════════════════════════════════"
+        log "WARN" "  RESET_CONFIG_ON_START=true"
+        log "WARN" "  Open WebUI will WIPE every admin-panel setting on this boot"
+        log "WARN" "  and re-seed it from the environment. Users and chats are"
+        log "WARN" "  kept. Switch this variable back off after this boot, or it"
+        log "WARN" "  happens on every restart."
+        log "WARN" "══════════════════════════════════════════════════════════════"
+        log "WARN" ""
+    fi
 }
 
 check_gpu() {
@@ -101,6 +118,29 @@ start_ollama() {
     exit 1
 }
 
+ensure_embedding_model() {
+    # RAG_EMBEDDING_ENGINE=ollama means Open WebUI never downloads a model from
+    # Hugging Face, but Ollama needs an embedding model to hand it. Pull once;
+    # it lives on the volume afterwards. This is an outbound call to
+    # registry.ollama.ai carrying the model name - the same channel every chat
+    # model pull uses.
+    local model="${RAG_EMBEDDING_MODEL:-nomic-embed-text}"
+    log "INFO" "🧬 Checking embedding model for RAG..."
+
+    if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qE "^${model}(:latest)?$"; then
+        log "INFO" "  ✓ ${model} present in /workspace/models"
+    else
+        log "INFO" "  • ${model} not found - pulling from registry.ollama.ai (one-time, persists on the volume)"
+        if ollama pull "${model}" > /tmp/embed-pull.log 2>&1; then
+            log "INFO" "  ✓ ${model} pulled"
+        else
+            log "WARN" "  ⚠ Pull failed - RAG and file uploads will error until an embedding model exists"
+            tail -5 /tmp/embed-pull.log || true
+        fi
+    fi
+    log "INFO" ""
+}
+
 start_webui() {
     log "INFO" "🌐 Starting Open WebUI..."
 
@@ -114,8 +154,7 @@ start_webui() {
     log "INFO" "  • WebUI PID: $WEBUI_PID"
     log "INFO" "  • Waiting for WebUI to be ready..."
 
-    # Wait for Open WebUI (max 120 seconds - first boot runs DB migrations
-    # and fetches the embedding model)
+    # Wait for Open WebUI (max 120 seconds - first boot runs DB migrations)
     for i in {1..120}; do
         if curl -sf http://localhost:${WEBUI_PORT:-8080}/health > /dev/null 2>&1; then
             log "INFO" "  ✓ Open WebUI ready on port ${WEBUI_PORT:-8080}"
@@ -165,9 +204,11 @@ trap 'cleanup; exit 0' SIGTERM SIGINT
 main() {
     print_banner
     print_config
+    warn_if_config_reset
     check_gpu
     setup_storage
     start_ollama
+    ensure_embedding_model
     start_webui
     print_success
 

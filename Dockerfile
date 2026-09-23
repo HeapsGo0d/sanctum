@@ -30,6 +30,20 @@ ENV DATA_DIR=/workspace/data \
     AUDIT_LOG_LEVEL=NONE \
     ENABLE_AUDIT_LOGS_FILE=false
 
+# Open WebUI outbound features - all off. Each is on by default upstream and
+# would contact a third party. OFFLINE_MODE also forces the GitHub version
+# check off and HF_HUB_OFFLINE=1; embeddings go through Ollama instead of a
+# Hugging Face download. See README "What prevents outbound contact".
+ENV ENABLE_COMMUNITY_SHARING=false \
+    ENABLE_OPENAI_API=false \
+    ENABLE_DIRECT_CONNECTIONS=false \
+    ENABLE_WEB_SEARCH=false \
+    ENABLE_CODE_EXECUTION=false \
+    ENABLE_CODE_INTERPRETER=false \
+    OFFLINE_MODE=true \
+    RAG_EMBEDDING_ENGINE=ollama \
+    RAG_EMBEDDING_MODEL=nomic-embed-text
+
 # Sanctum version (stamped by CI from the git tag; "dev" for local builds)
 ARG SANCTUM_VERSION=dev
 ENV SANCTUM_VERSION=${SANCTUM_VERSION}

@@ -85,7 +85,15 @@ docker exec sanctum env | grep -E 'OLLAMA_NO_CLOUD|ANONYMIZED_TELEMETRY|WEBUI_AU
 | `WEBUI_ADMIN_EMAIL` | *(unset)* | With `WEBUI_ADMIN_PASSWORD`, pre-creates the admin at first boot |
 | `WEBUI_ADMIN_PASSWORD` | *(unset)* | See above. Only used while the user table is empty |
 | `WEBUI_PORT` | `8080` | Open WebUI port |
-| `RAG_EMBEDDING_ENGINE` | *(unset)* | Set to `ollama` to run RAG embeddings on the GPU via Ollama instead of the bundled CPU model |
+| `RAG_EMBEDDING_ENGINE` | `ollama` | RAG embeddings via Ollama — no Hugging Face download |
+| `RAG_EMBEDDING_MODEL` | `nomic-embed-text` | Pulled onto the volume at first boot if missing |
+| `OFFLINE_MODE` | `true` | No Hugging Face contact; also forces the GitHub version check off |
+| `ENABLE_OPENAI_API` | `false` | No OpenAI-compatible connections (upstream default polls `api.openai.com`) |
+| `ENABLE_COMMUNITY_SHARING` | `false` | Removes the "share to openwebui.com" button |
+| `ENABLE_DIRECT_CONNECTIONS` | `false` | Users cannot add their own model endpoints |
+| `ENABLE_WEB_SEARCH` | `false` | No search-provider calls |
+| `ENABLE_CODE_EXECUTION` / `ENABLE_CODE_INTERPRETER` | `false` | Browser never fetches Pyodide from a CDN |
+| `RESET_CONFIG_ON_START` | `false` | Set `true` for **one** boot to re-seed stored settings from these variables |
 
 ### A Note on GPU Usage
 
@@ -94,13 +102,10 @@ release. Open WebUI's PyTorch is installed as a **CPU-only** build, because it i
 only for local RAG embeddings and Whisper transcription — keeping the CUDA wheels out
 saves roughly 4.5GB of image, which is pod pull time on every cold start.
 
-If you want RAG embeddings on the GPU, point them at Ollama instead:
-
-```bash
-ollama pull nomic-embed-text          # or any embedding model
-# then set in the template environment:
-RAG_EMBEDDING_ENGINE=ollama
-```
+RAG embeddings already go through Ollama (`RAG_EMBEDDING_ENGINE=ollama`,
+`nomic-embed-text`, pulled at first boot), so they run on the GPU and nothing is fetched
+from Hugging Face. Whisper transcription remains CPU-only and, with `OFFLINE_MODE=true`,
+its model is not auto-downloaded — speech-to-text is effectively off unless you supply one.
 
 ## 🔐 Authentication
 
@@ -158,12 +163,58 @@ blocked nothing while implying it did. The controls that work are settings:
 | `ANONYMIZED_TELEMETRY=false` | Chroma's PostHog telemetry |
 | `SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true` | Open WebUI and dependency analytics |
 | `AUDIT_LOG_LEVEL=NONE`, `ENABLE_AUDIT_LOGS_FILE=false` | Request audit logs being written to the volume |
+| `OFFLINE_MODE=true` | Hugging Face downloads (`HF_HUB_OFFLINE=1`) and the `api.github.com` version check |
+| `RAG_EMBEDDING_ENGINE=ollama` | The `all-MiniLM-L6-v2` download from Hugging Face on first boot |
+| `ENABLE_OPENAI_API=false` | Model-list polls to `api.openai.com` (on by default upstream, even with no key) |
+| `ENABLE_COMMUNITY_SHARING=false` | The one-click chat upload to openwebui.com |
+| `ENABLE_DIRECT_CONNECTIONS=false`, `ENABLE_WEB_SEARCH=false` | User-added endpoints and search providers |
+| `ENABLE_CODE_EXECUTION=false`, `ENABLE_CODE_INTERPRETER=false` | Pyodide + packages fetched by your browser from jsdelivr/PyPI |
 
 What still leaves the pod, by design:
 
 - **Model pulls** go to `registry.ollama.ai` and carry the model name and the pod's IP.
 - **The UI in your browser** is served by the pod, but RunPod's proxy and Cloudflare sit in
   front of it — see Security Notes.
+
+### Admin-panel settings that affect privacy
+
+Settings are persisted in `webui.db` and a value changed in the admin panel **overrides the
+template** from then on. Leave these alone unless you mean it:
+
+- **Settings → Connections**: OpenAI API, Direct Connections — any endpoint added here
+  receives full conversations.
+- **Settings → Web Search**: sends your query text to the provider.
+- **Settings → Code Execution / Code Interpreter**: loads Pyodide from a CDN in your browser.
+- **Settings → General → Community Sharing**: one-click upload of a chat to openwebui.com.
+- **Workspace → Functions / Tools, Admin → Pipelines**: arbitrary Python running inside the
+  container as the service user. These live in their own tables and are not touched by the
+  config reset below.
+- **Pulling a `*-cloud` model**: `OLLAMA_NO_CLOUD=1` refuses it, but the pull UI will still
+  list them.
+
+### Existing volumes: one-shot settings reset
+
+A volume created before v1.2.0 has the old defaults stored in `webui.db` (OpenAI API on,
+community sharing on, …) and those stored values win over the new template. To re-seed:
+
+1. Note any admin-panel settings you changed on purpose — the reset wipes **all** of them.
+   Users, chats, models and knowledge are untouched (it clears only the `config` table).
+2. Set `RESET_CONFIG_ON_START=true` in the pod's environment and restart. The startup log
+   prints a boxed warning while it is on.
+3. Set it back to `false` and restart again. Left on, it wipes settings on every boot.
+
+### Changing the embedding model
+
+Anything already in `/workspace/data/vector_db/` was embedded with the old model and will not
+match queries made with the new one. After the switch (including the v1.1 → v1.2 move to
+`nomic-embed-text`), run **Admin → Settings → Documents → Reindex Knowledge and Memory
+Vectors**, or re-upload the documents.
+
+### What `OFFLINE_MODE=true` also turns off
+
+- Local Whisper speech-to-text model auto-download (no STT unless you provide a model).
+- `pip install` of a Function's declared `requirements` at install time.
+- The "new version available" banner (the `api.github.com` check).
 
 ## 💾 Storage
 
