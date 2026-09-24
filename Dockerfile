@@ -68,9 +68,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama (manual binary installation - proper method)
-# Version pinned for reproducible builds - review quarterly for updates
+# Version pinned for reproducible builds - review quarterly for updates.
+# On each bump, diff envconfig/config.go for new OLLAMA_* knobs - see CONTEXT.md
 # Note: upstream switched the linux asset from .tgz to .tar.zst - see CONTEXT.md
-ARG OLLAMA_VERSION=v0.32.14
+ARG OLLAMA_VERSION=v0.34.3
 RUN curl -fsSL -o /tmp/ollama.tar.zst \
     https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst \
     && tar -C /usr --zstd -xf /tmp/ollama.tar.zst \

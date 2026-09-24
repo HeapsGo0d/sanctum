@@ -72,12 +72,15 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
   see "Why No /etc/hosts Blocklist?"
 
 ### Why Pinned Ollama Version?
-- **Decision**: Pin Ollama to specific version (v0.32.14), not dynamic "latest"
+- **Decision**: Pin Ollama to specific version (v0.34.3), not dynamic "latest"
 - **Reason**: Reproducible builds, simple to understand, no API rate limits or failures
 - **Philosophy**: Aligns with "simple, functional, elegant" - one-line version updates
 - **Maintenance**: Review quarterly or when important updates announced
-- **Current**: v0.32.14 (updated 2026-08-19)
-- **File**: `Dockerfile:60`
+- **Current**: v0.34.3 (updated 2026-09-24, from v0.32.14)
+- **Bump review**: diff the `OLLAMA_*` table in `envconfig/config.go` between the two tags. v0.32.14 →
+  v0.34.3 added only `OLLAMA_CREATE_REMOTE` (default off; routes local `ollama create` through the
+  server API — not a network feature). `NoCloud()` unchanged; `OLLAMA_HOST` default still 127.0.0.1
+- **File**: `Dockerfile` (`ARG OLLAMA_VERSION`)
 
 ### Why `.tar.zst` for the Ollama Download?
 - **Decision**: Extract Ollama from `ollama-linux-amd64.tar.zst` with `tar --zstd`, and add `zstd` to the apt list
@@ -143,8 +146,8 @@ Sanctum is designed to be the minimal, honest alternative to complex AI hosting 
 - **Also pinned**: `jlumbroso/free-disk-space` in CI to commit `36e9a5a` (v2.0.0) instead of
   `@main`; it runs before the image build, so a compromised `main` could tamper with the
   image. v2.0.0 accepts every input the workflow passes (checked `action.yml`)
-- **Not bumped here**: Ollama v0.32.14 → v0.34.3 is available (`.tar.zst` asset present,
-  `OLLAMA_NO_CLOUD` and `OLLAMA_HOST` semantics unchanged). Out of scope for a privacy branch
+- **Ollama** bumped separately in the same branch (v0.32.14 → v0.34.3) after the same kind of
+  env-table review; see "Why Pinned Ollama Version?"
 - **File**: `Dockerfile` (Open WebUI RUN block), `.github/workflows/build-and-push.yml`
 
 ### Why Is the Version a Build ARG?
@@ -283,6 +286,7 @@ default and behaviour was checked against Open WebUI `main` (== v0.11.4) `config
 - [x] `free-disk-space` pinned to SHA; `open-webui==0.11.4`; 0.11.0→0.11.4 default review
 - [x] README: "What Sanctum cannot protect against", outbound-contact table, admin-toggle list,
       stale "Search Ollama.com" corrected
+- [x] Ollama v0.32.14 → v0.34.3 (env-table diff: only `OLLAMA_CREATE_REMOTE`, default off)
 
 **Decision not taken — `ENABLE_PERSISTENT_CONFIG=false`**: considered and rejected. Once login
 is on, only the admin (or someone holding the admin session) can change settings, and such an

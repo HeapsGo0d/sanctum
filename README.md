@@ -27,7 +27,7 @@ model includes the hosting provider, run it on hardware you control.
 
 - **🔒 Privacy-First**: Login required, all telemetry off, outbound features disabled by default
 - **⚡ Fast Startup**: Two services, no unnecessary operations
-- **🧩 Pinned Stack**: Ollama v0.32.14 + Open WebUI 0.11.4, both explicit build ARGs
+- **🧩 Pinned Stack**: Ollama v0.34.3 + Open WebUI 0.11.4, both explicit build ARGs
 - **🎯 Minimal**: Clean architecture, essential functionality only
 - **💾 Persistent Storage**: Models and data survive pod restarts
 - **🎮 GPU Support**: Automatic NVIDIA GPU detection and configuration
@@ -396,6 +396,9 @@ diff <(curl -fsSL https://raw.githubusercontent.com/open-webui/open-webui/v0.11.
 Do the same for `env.py`. Anything new that defaults on and talks outward gets an explicit
 `false` in the Dockerfile and a row in "What prevents outbound contact". Then re-check the
 admin-panel list in that section still matches the UI.
+
+For Ollama, diff the `OLLAMA_*` table in `envconfig/config.go` between the two tags the same
+way, and confirm `ollama-linux-amd64.tar.zst` exists on the release before bumping.
 
 ### Push to Docker Hub
 
