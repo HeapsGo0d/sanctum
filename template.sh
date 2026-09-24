@@ -26,6 +26,13 @@ TEMPLATE_DESCRIPTION="Minimal, privacy-first Ollama + Open WebUI for RunPod. Log
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-50}"
 VOLUME_GB="${VOLUME_GB:-20}"
 
+# First admin. RunPod drops empty env values, so both are always sent with a
+# real value. The password is generated per run unless given - there is
+# deliberately no fixed default that could be forgotten and left live.
+WEBUI_ADMIN_EMAIL="${WEBUI_ADMIN_EMAIL:-admin@sanctum.local}"
+WEBUI_ADMIN_PASSWORD="${WEBUI_ADMIN_PASSWORD:-}"
+PASSWORD_GENERATED=false
+
 # RunPod API endpoints
 RUNPOD_REST_URL="https://rest.runpod.io/v1/templates"
 RUNPOD_GRAPHQL_URL="https://api.runpod.io/graphql"
@@ -125,6 +132,27 @@ set_names_from_version() {
     fi
 }
 
+# Random password: 24 chars of base64 - safe inside JSON without escaping
+generate_password() {
+    if command -v openssl &> /dev/null; then
+        openssl rand -base64 18
+    else
+        head -c 18 /dev/urandom | base64
+    fi
+}
+
+# Escape a value for inclusion inside a JSON string literal
+json_escape() {
+    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+ensure_admin_password() {
+    if [[ -z "$WEBUI_ADMIN_PASSWORD" ]]; then
+        WEBUI_ADMIN_PASSWORD=$(generate_password)
+        PASSWORD_GENERATED=true
+    fi
+}
+
 # Get user input for configuration
 get_configuration() {
     echo -e "${YELLOW}🔧 Configuration Setup${NC}"
@@ -133,8 +161,10 @@ get_configuration() {
     if [[ "$YES_MODE" == true ]]; then
         VERSION_TAG="${VERSION_ARG:-latest}"
         set_names_from_version
+        ensure_admin_password
         echo "  → Docker Image: $DOCKER_IMAGE"
         echo "  → Container Disk: ${CONTAINER_DISK_GB}GB, Volume: ${VOLUME_GB}GB"
+        echo "  → Admin Email: $WEBUI_ADMIN_EMAIL"
         echo ""
         return
     fi
@@ -156,11 +186,22 @@ get_configuration() {
     read -p "Default volume size in GB [${VOLUME_GB}]: " tmp_vol
     VOLUME_GB=${tmp_vol:-$VOLUME_GB}
     echo ""
+
+    # First admin (created by Open WebUI at first boot while no users exist)
+    echo -e "${BLUE}First Admin:${NC}"
+    read -p "Admin email [${WEBUI_ADMIN_EMAIL}]: " tmp_email
+    WEBUI_ADMIN_EMAIL=${tmp_email:-$WEBUI_ADMIN_EMAIL}
+    read -s -p "Admin password [blank = generate a random one]: " tmp_pw
+    echo ""
+    WEBUI_ADMIN_PASSWORD=${tmp_pw:-$WEBUI_ADMIN_PASSWORD}
+    ensure_admin_password
+    echo "  → Admin Email: $WEBUI_ADMIN_EMAIL"
+    echo ""
 }
 
 # Readme body, shared by both API paths (JSON string, escaped newlines)
 make_readme() {
-    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Login required (WEBUI_AUTH=True); set WEBUI_ADMIN_EMAIL/PASSWORD before first boot\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net (TLS ends at RunPod's proxy)\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## What this cannot protect against\\nRunPod and its data-centre partner have root on the host: pod memory, disk, the /workspace volume and proxied traffic are all readable by them. No setting here changes that.\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b\\nEach pull sends the model name to registry.ollama.ai."
+    printf '%s' "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Features\\n- Login required (WEBUI_AUTH=True); the first admin is created from WEBUI_ADMIN_EMAIL/PASSWORD at first boot - edit them in this template before launching\\n- Ollama cloud/update checks disabled (OLLAMA_NO_CLOUD=1)\\n- Open WebUI telemetry disabled\\n- Minimal architecture: fast startup, clean design\\n- Persistent storage for models and data\\n\\n## Storage\\n- Container: ${CONTAINER_DISK_GB}GB\\n- Volume: ${VOLUME_GB}GB mounted at /workspace\\n\\n## Access\\n- Open WebUI: https://[pod-id]-8080.proxy.runpod.net (TLS ends at RunPod's proxy)\\n- SSH: RunPod provides host-level SSH automatically\\n\\n## What this cannot protect against\\nRunPod and its data-centre partner have root on the host: pod memory, disk, the /workspace volume and proxied traffic are all readable by them. No setting here changes that.\\n\\n## First Run\\nNo models ship in the image. Pull one from the WebUI\\n(Settings → Models) or run: ollama pull llama3.2:1b\\nEach pull sends the model name to registry.ollama.ai."
 }
 
 # Generate template JSON (manual upload option; schema differs from the API)
@@ -207,13 +248,13 @@ generate_template() {
     },
     {
       "key": "WEBUI_ADMIN_EMAIL",
-      "value": "",
-      "description": "Set before first boot to pre-create the admin (avoids the first-visitor-becomes-admin race)"
+      "value": "$(json_escape "$WEBUI_ADMIN_EMAIL")",
+      "description": "First admin login; created at first boot while no users exist. Edit before launching"
     },
     {
       "key": "WEBUI_ADMIN_PASSWORD",
-      "value": "",
-      "description": "Password for WEBUI_ADMIN_EMAIL; only used when no users exist yet"
+      "value": "$(json_escape "$WEBUI_ADMIN_PASSWORD")",
+      "description": "Password for WEBUI_ADMIN_EMAIL; only used when no users exist yet. Edit before launching"
     },
     {
       "key": "WEBUI_PORT",
@@ -244,6 +285,15 @@ print_summary() {
     echo -e "${BLUE}Access:${NC}"
     echo "  Open WebUI: https://[pod-id]-8080.proxy.runpod.net"
     echo "  SSH: RunPod provides host-level SSH (see RunPod console)"
+    echo ""
+    echo -e "${BLUE}First Admin (created at first boot on a fresh volume):${NC}"
+    echo "  Email:    $WEBUI_ADMIN_EMAIL"
+    echo "  Password: $WEBUI_ADMIN_PASSWORD"
+    if [[ "$PASSWORD_GENERATED" == true ]]; then
+        echo -e "  ${YELLOW}Generated for this run - shown once. It is stored in the template's${NC}"
+        echo -e "  ${YELLOW}environment (and in sanctum_template.json); change it in the RunPod console${NC}"
+        echo -e "  ${YELLOW}or set WEBUI_ADMIN_PASSWORD before running this script.${NC}"
+    fi
     echo ""
 }
 
@@ -279,8 +329,8 @@ deploy_rest() {
     "OLLAMA_MODELS": "/workspace/models",
     "DATA_DIR": "/workspace/data",
     "WEBUI_AUTH": "True",
-    "WEBUI_ADMIN_EMAIL": "",
-    "WEBUI_ADMIN_PASSWORD": "",
+    "WEBUI_ADMIN_EMAIL": "$(json_escape "$WEBUI_ADMIN_EMAIL")",
+    "WEBUI_ADMIN_PASSWORD": "$(json_escape "$WEBUI_ADMIN_PASSWORD")",
     "WEBUI_PORT": "8080",
     "RESET_CONFIG_ON_START": "false"
   }
@@ -333,8 +383,8 @@ deploy_graphql() {
     {"key": "OLLAMA_MODELS", "value": "/workspace/models"},
     {"key": "DATA_DIR", "value": "/workspace/data"},
     {"key": "WEBUI_AUTH", "value": "True"},
-    {"key": "WEBUI_ADMIN_EMAIL", "value": ""},
-    {"key": "WEBUI_ADMIN_PASSWORD", "value": ""},
+    {"key": "WEBUI_ADMIN_EMAIL", "value": "$(json_escape "$WEBUI_ADMIN_EMAIL")"},
+    {"key": "WEBUI_ADMIN_PASSWORD", "value": "$(json_escape "$WEBUI_ADMIN_PASSWORD")"},
     {"key": "WEBUI_PORT", "value": "8080"},
     {"key": "RESET_CONFIG_ON_START", "value": "false"}
   ]

@@ -101,8 +101,8 @@ docker exec sanctum env | grep -E 'OLLAMA_NO_CLOUD|ANONYMIZED_TELEMETRY|WEBUI_AU
 | `WEBUI_AUTH` | `True` | Open WebUI login. Leave on — a proxied RunPod pod is always public |
 | `ENABLE_SIGNUP` | `false` | No self-registration after the first admin exists |
 | `DEFAULT_USER_ROLE` | `pending` | Any account that does get created waits for admin approval |
-| `WEBUI_ADMIN_EMAIL` | *(unset)* | With `WEBUI_ADMIN_PASSWORD`, pre-creates the admin at first boot |
-| `WEBUI_ADMIN_PASSWORD` | *(unset)* | See above. Only used while the user table is empty |
+| `WEBUI_ADMIN_EMAIL` | `admin@sanctum.local` (from `template.sh`) | With `WEBUI_ADMIN_PASSWORD`, pre-creates the admin at first boot |
+| `WEBUI_ADMIN_PASSWORD` | *(generated per `template.sh` run)* | See above. Only used while the user table is empty |
 | `WEBUI_PORT` | `8080` | Open WebUI port |
 | `RAG_EMBEDDING_ENGINE` | `ollama` | RAG embeddings via Ollama — no Hugging Face download |
 | `RAG_EMBEDDING_MODEL` | `nomic-embed-text` | Pulled onto the volume at first boot if missing |
@@ -135,11 +135,21 @@ in the container.
 
 ### Fresh volume
 
-Set `WEBUI_ADMIN_EMAIL` and `WEBUI_ADMIN_PASSWORD` in the template **before the first
-boot**. Open WebUI creates that admin at startup (only while no users exist) and the first
-signup race never happens.
+`template.sh` always puts `WEBUI_ADMIN_EMAIL` and `WEBUI_ADMIN_PASSWORD` in the template
+(RunPod silently drops empty values, so they are never sent blank). The email defaults to
+`admin@sanctum.local`; the password is **generated per run and printed once** in the
+script's summary. Override either with an environment variable or the interactive prompt:
 
-If you leave them unset, the **first person to sign up becomes admin**. Open WebUI does not
+```bash
+WEBUI_ADMIN_EMAIL=you@example.com WEBUI_ADMIN_PASSWORD='…' ./template.sh -y v1.2.0 --deploy
+```
+
+You can also edit both in the RunPod console before launching the pod. Open WebUI creates
+that admin at startup (only while no users exist) and the first-signup race never happens.
+There is deliberately no fixed default password: a forgotten `changeme` would be a live admin
+credential on a public URL.
+
+If you remove them, the **first person to sign up becomes admin**. Open WebUI does not
 gate that first signup on `ENABLE_SIGNUP`, so you cannot lock yourself out — but you must be
 the one who gets there first. Open the URL as soon as the startup log prints
 "Sanctum started successfully".
